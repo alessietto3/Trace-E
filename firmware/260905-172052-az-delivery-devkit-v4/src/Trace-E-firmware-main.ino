@@ -4,6 +4,7 @@
 #include <DNSServer.h>
 #include <ESPmDNS.h>
 #include <SPI.h>
+#include <SD.h>
 #include <ESP32Servo.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
@@ -30,6 +31,11 @@
 #define TFT_SCK 18
 #define TFT_MOSI 23
 
+// SD card SPI pins. SCK, MOSI and MISO are shared with the TFT;
+// each device has its own chip-select line.
+#define SD_CS 5
+#define SD_MISO 19
+
 
 // DNS Server for Captive Portal
 DNSServer dnsServer;
@@ -37,6 +43,7 @@ const byte DNS_PORT = 53;
 
 Adafruit_ST7735 display(TFT_CS, TFT_DC, TFT_RST);
 WebServer server(80);
+bool sdCardReady = false;
 
 // Global state for animations
 String currentCommand = "";
@@ -643,8 +650,12 @@ void setup() {
   Serial.begin(115200);
   randomSeed(micros());
   
-  // SPI init for the ST7735. Drawing is immediate; no display() call is needed.
-  SPI.begin(TFT_SCK, -1, TFT_MOSI, TFT_CS);
+  // Shared SPI init for the ST7735 and SD card.
+  SPI.begin(TFT_SCK, SD_MISO, TFT_MOSI, TFT_CS);
+  pinMode(TFT_CS, OUTPUT);
+  digitalWrite(TFT_CS, HIGH);
+  pinMode(SD_CS, OUTPUT);
+  digitalWrite(SD_CS, HIGH);
   display.initR(INITR_BLACKTAB);
   display.setRotation(0);
   display.fillScreen(ST7735_BLACK);
@@ -653,6 +664,9 @@ void setup() {
   display.setTextSize(1);
   display.setCursor(0,0);
   display.println(F("Setting up WiFi..."));
+
+  sdCardReady = SD.begin(SD_CS, SPI);
+  Serial.println(sdCardReady ? F("SD card ready.") : F("No SD card detected."));
 
   // --- WIFI CONFIGURATION ---
   // Don't write credentials to NVS flash: runtime WiFi setup is session-only
