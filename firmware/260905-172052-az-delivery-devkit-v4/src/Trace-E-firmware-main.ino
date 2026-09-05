@@ -97,8 +97,8 @@ Servo servos[8];
 // Sesame Distro Board V1 Pinout (Legacy)
 //const int servoPins[8] = {15, 2, 23, 19, 4, 16, 17, 18};
 
-// Lolin S2 Mini Pinout
-const int servoPins[8] = {1, 2, 4, 6, 8, 10, 13, 14};
+// Servo wiring for the current setup. GPIO4 is reserved for TFT DC.
+const int servoPins[8] = {1, 2, 25, 6, 8, 10, 13, 14};
 
 // Subtrim values for each servo (offset in degrees)
 int8_t servoSubtrim[8] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -872,7 +872,14 @@ void loop() {
 // Function to update the robot's face
 void updateFaceBitmap(const unsigned char* bitmap) {
   display.fillScreen(ST7735_BLACK);
-  display.drawBitmap(0, 0, bitmap, 128, 64, ST7735_WHITE);
+  for (int16_t y = 0; y < 64; y++) {
+    for (int16_t x = 0; x < 128; x++) {
+      uint8_t bitmapByte = pgm_read_byte(bitmap + y * 16 + (x >> 3));
+      if (bitmapByte & (0x80 >> (x & 7))) {
+        display.drawPixel(x, y, ST7735_WHITE);
+      }
+    }
+  }
 }
 
 uint8_t countFrames(const unsigned char* const* frames, uint8_t maxFrames) {
@@ -1093,19 +1100,19 @@ void updateWifiInfoScroll() {
     lastWifiScrollMs = now;
     
     // Clear and redraw with current face in background
-    display.fillScreen(ST7735_BLACK);
+    display.fillScreen(ST7735_WHITE);
     
     // Draw the face bitmap in the background
     if (currentFaceFrames != nullptr && currentFaceFrameCount > 0) {
-      display.drawBitmap(0, 0, currentFaceFrames[currentFaceFrameIndex], 128, 64, ST7735_WHITE);
+      display.drawBitmap(0, 0, currentFaceFrames[currentFaceFrameIndex], 128, 64, ST7735_BLACK, ST7735_WHITE);
     }
     
     // Draw black bar for text background on top row
-    display.fillRect(0, 0, 128, 10, ST7735_BLACK);
+    display.fillRect(0, 0, 128, 10, ST7735_WHITE);
     
     // Draw scrolling text
     display.setTextSize(1);
-    display.setTextColor(ST7735_WHITE);
+    display.setTextColor(ST7735_BLACK);
     display.setTextWrap(false);
     display.setCursor(-wifiScrollPos, 1);
     display.print(wifiInfoText);
