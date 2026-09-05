@@ -1100,19 +1100,19 @@ void updateWifiInfoScroll() {
     lastWifiScrollMs = now;
     
     // Clear and redraw with current face in background
-    display.fillScreen(ST7735_WHITE);
+    display.fillScreen(ST7735_BLACK);
     
     // Draw the face bitmap in the background
     if (currentFaceFrames != nullptr && currentFaceFrameCount > 0) {
-      display.drawBitmap(0, 0, currentFaceFrames[currentFaceFrameIndex], 128, 64, ST7735_BLACK, ST7735_WHITE);
+      display.drawBitmap(0, 0, currentFaceFrames[currentFaceFrameIndex], 128, 64, ST7735_WHITE, ST7735_BLACK);
     }
     
     // Draw black bar for text background on top row
-    display.fillRect(0, 0, 128, 10, ST7735_WHITE);
+    display.fillRect(0, 0, 128, 10, ST7735_BLACK);
     
     // Draw scrolling text
     display.setTextSize(1);
-    display.setTextColor(ST7735_BLACK);
+    display.setTextColor(ST7735_WHITE);
     display.setTextWrap(false);
     display.setCursor(-wifiScrollPos, 1);
     display.print(wifiInfoText);
