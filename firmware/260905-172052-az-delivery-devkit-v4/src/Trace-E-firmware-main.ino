@@ -3,10 +3,10 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <ESPmDNS.h>
-#include <Wire.h>
+#include <SPI.h>
 #include <ESP32Servo.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <Adafruit_ST7735.h>
 #include "face-bitmaps.h"
 #include "movement-sequences.h"
 #include "captive-portal.h"
@@ -23,29 +23,19 @@
 #define NETWORK_PASS ""  // Your WiFi password
 #define ENABLE_NETWORK_MODE false  // Set to true to enable network connection attempts
 
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_RESET -1
-#define OLED_I2C_ADDR 0x3C
-
-// I2C Pins for Distro Board V2 / V3
-//#define I2C_SDA 8
-//#define I2C_SCL 9
-
-// I2C Pins for Distro Board V1
-//#define I2C_SDA 21
-//#define I2C_SCL 22
-
-// I2C Pins for S2 Mini Board
-#define I2C_SDA 33
-#define I2C_SCL 35
+// ST7735 SPI display pins
+#define TFT_CS 17
+#define TFT_RST 16
+#define TFT_DC 4
+#define TFT_SCK 18
+#define TFT_MOSI 23
 
 
 // DNS Server for Captive Portal
 DNSServer dnsServer;
 const byte DNS_PORT = 53;
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_ST7735 display(TFT_CS, TFT_DC, TFT_RST);
 WebServer server(80);
 
 // Global state for animations
@@ -653,21 +643,16 @@ void setup() {
   Serial.begin(115200);
   randomSeed(micros());
   
-  // I2C Init for ESP32
-  Wire.begin(I2C_SDA, I2C_SCL);
-
-  // OLED Init
-  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
-    Serial.println(F("SSD1306 allocation failed."));
-    while (1);
-  }
+  // SPI init for the ST7735. Drawing is immediate; no display() call is needed.
+  SPI.begin(TFT_SCK, -1, TFT_MOSI, TFT_CS);
+  display.initR(INITR_BLACKTAB);
+  display.setRotation(0);
+  display.fillScreen(ST7735_BLACK);
   
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
+  display.setTextColor(ST7735_WHITE);
   display.setTextSize(1);
   display.setCursor(0,0);
   display.println(F("Setting up WiFi..."));
-  display.display();
 
   // --- WIFI CONFIGURATION ---
   // Don't write credentials to NVS flash: runtime WiFi setup is session-only
@@ -886,9 +871,8 @@ void loop() {
 
 // Function to update the robot's face
 void updateFaceBitmap(const unsigned char* bitmap) {
-  display.clearDisplay();
-  display.drawBitmap(0, 0, bitmap, 128, 64, SSD1306_WHITE);
-  display.display();
+  display.fillScreen(ST7735_BLACK);
+  display.drawBitmap(0, 0, bitmap, 128, 64, ST7735_WHITE);
 }
 
 uint8_t countFrames(const unsigned char* const* frames, uint8_t maxFrames) {
@@ -1109,25 +1093,23 @@ void updateWifiInfoScroll() {
     lastWifiScrollMs = now;
     
     // Clear and redraw with current face in background
-    display.clearDisplay();
+    display.fillScreen(ST7735_BLACK);
     
     // Draw the face bitmap in the background
     if (currentFaceFrames != nullptr && currentFaceFrameCount > 0) {
-      display.drawBitmap(0, 0, currentFaceFrames[currentFaceFrameIndex], 128, 64, SSD1306_WHITE);
+      display.drawBitmap(0, 0, currentFaceFrames[currentFaceFrameIndex], 128, 64, ST7735_WHITE);
     }
     
     // Draw black bar for text background on top row
-    display.fillRect(0, 0, 128, 10, SSD1306_BLACK);
+    display.fillRect(0, 0, 128, 10, ST7735_BLACK);
     
     // Draw scrolling text
     display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
+    display.setTextColor(ST7735_WHITE);
     display.setTextWrap(false);
     display.setCursor(-wifiScrollPos, 1);
     display.print(wifiInfoText);
     display.setTextWrap(true);
-    
-    display.display();
     
     // Advance scroll position
     wifiScrollPos += 2;
