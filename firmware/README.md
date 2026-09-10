@@ -784,33 +784,49 @@ To port this to a different ESP32 variant, modify the `servoPins` and `I2C_` def
 
 ## Asset Pipeline & Face Customization
 
-To maintain a clean main source file and optimize performance, face bitmaps are decoupled from the primary logic. Faces are managed in [face-bitmaps.h](face-bitmaps.h) using a "Single Source of Truth" macro system.
+To maintain a clean main source file and optimize performance, face bitmaps are decoupled from the primary logic. 
+- **OLED Display (128x64)**: Uses [face-bitmaps.h](face-bitmaps.h).
+- **Color TFT Display (160x128 Landscape)**: Uses [face-bitmaps-tft.h](face-bitmaps-tft.h) featuring large expressive robot eyes with dynamic emotional color mapping (Cyan, Red, Magenta, Yellow, Blue).
 
-### Face Library
+Faces are managed using a unified `FACE_LIST` macro system.
 
-The firmware includes an extensive library of faces organized into three categories:
+### Face Library & Emotion Map
 
-#### Movement Faces
+The firmware includes an extensive library of 48 faces and animated sequences:
 
-Synchronized with physical poses and animations:
+| Category | Faces | TFT Color | Meaning / Behavior |
+|----------|-------|-----------|--------------------|
+| **Emotions** | `happy`, `talk_happy` | Cyan | Cheerful smiling upward arches (`^_^`) |
+| | `angry`, `talk_angry` | Red | Inward angled stern glare (`\ /`) |
+| | `sad`, `talk_sad` | Cyan | Downward drooping sorrowful eyes (`/ \`) |
+| | `surprised`, `talk_surprised` | Cyan | Tall wide-open eyes (`O O`) with pupils |
+| | `sleepy`, `talk_sleepy` | Blue | Heavy droopy eyelids (70% closed) |
+| | `love`, `talk_love` | Magenta | Symmetrical glowing hearts (`<3 <3`) |
+| | `excited`, `talk_excited` | Yellow | Wide joyful eyes with 8-point sparkling stars |
+| | `confused`, `talk_confused` | Cyan | Asymmetrical "Huh?" (one eye tall, one eye squinted `o _`) |
+| | `thinking`, `thinking_2`, `talk_thinking` | Cyan | Eyes glancing up and to the top-right corner |
+| | `cute` | Magenta | Kawaii anime eyes with double light glints and blush marks |
+| | `dead`, `dead_1`, `dead_2` | Red | Bold `X X` crossed eyes, glitch frames, and flatline dashes |
+| | `freaky` | Cyan | Concentric circular hypnotic rings (`@ @`) |
+| **Idle & System** | `idle`, `defualt` | Cyan | Standard neutral/friendly rounded capsule robot eyes |
+| | `idle_blink` (4 frames) | Cyan | Natural multi-frame eye blink sequence (0, 1, 2, 3) |
+| | `stand` | Cyan | Upright alert standing capsule eyes |
+| **Movement / Poses** | `walk` | Cyan | Focused forward squint with motion slant |
+| | `rest`, `rest_1`, `rest_2` | Blue | Peaceful closed curved eyes (`u u`) with floating `z Z` |
+| | `wave` | Cyan | Happy arch paired with a winking sparkle star eye |
+| | `dance`, `dance_1` | Cyan | Alternating winking arches grooving to the beat |
+| | `swim` | Cyan | Hydrodynamic curved visor with bridge connection |
+| | `point`, `point_1`, `point_2` | Cyan | Eyes shifting sharply to the right following pointed target |
+| | `pushup` | Cyan | Tightly squinted grit eyes (`> <`) under heavy effort |
+| | `bow` | Cyan | Respectful downward angled closed curves (`v v`) |
+| | `shake` | Cyan | Jittered offset eyes with vibration speed lines |
+| | `worm` | Cyan | Playful wavy undulating sine-curve eyes |
+| | `crab` | Cyan | Sideways peeking eyes looking hard to the side |
+| | `shrug` | Cyan | Raised brow with side-glance smirk |
 
-- `walk`, `rest`, `stand`, `swim`, `dance`, `wave`, `point`
-- `pushup`, `bow`, `cute`, `freaky`, `worm`, `shake`, `shrug`
-- `dead`, `crab`, `idle`, `idle_blink`
+#### Conversational Talk Variants
 
-#### Conversational Faces
-
-Designed for expressive communication and voice assistant integration:
-
-- **Base emotions**: `happy`, `sad`, `angry`, `surprised`, `sleepy`, `love`, `excited`, `confused`, `thinking`
-- **Talk variants**: `talk_happy`, `talk_sad`, `talk_angry`, `talk_surprised`, `talk_sleepy`, `talk_love`, `talk_excited`, `talk_confused`, `talk_thinking`
-
-The "talk_" variants feature open mouths for lip-sync and animated speech. These faces are perfect for:
-
-- Voice assistant projects (Alexa, Google Assistant, custom TTS)
-- Chatbot interfaces controlled via the JSON API
-- Interactive storytelling and educational applications
-- Remote-controlled performances
+The `talk_*` variants feature animated speech frames designed for voice assistant projects (Alexa, Google Assistant, custom TTS, or local LLM voice chats) or chatbot integration via `/api/command` or `/cmd?face=talk_happy`. In the Web UI, activating **Talk Mode** automatically directs emotion buttons to their `talk_*` counterparts!
 
 #### Special Faces
 

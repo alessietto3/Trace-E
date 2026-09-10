@@ -8,13 +8,13 @@
 #include <ESP32Servo.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
-#include "face-bitmaps.h"
+#include "face-bitmaps-tft.h"
 #include "movement-sequences.h"
 #include "captive-portal.h"
 
 // --- Access Point Configuration ---
 // This is the network the Robot will create
-#define AP_SSID  "Sesame-Controller"
+#define AP_SSID  "Trace-E-Controller"
 #define AP_PASS  "12345678" // Must be at least 8 characters
 
 // --- Station Mode Configuration (Optional) ---
@@ -52,7 +52,7 @@ const unsigned char* const* currentFaceFrames = nullptr;
 uint8_t currentFaceFrameCount = 0;
 uint8_t currentFaceFrameIndex = 0;
 unsigned long lastFaceFrameMs = 0;
-int faceFps = 8;
+int faceFps = 15;
 FaceAnimMode currentFaceMode = FACE_ANIM_LOOP;
 int8_t faceFrameDirection = 1;
 bool faceAnimFinished = false;
@@ -61,6 +61,10 @@ bool idleActive = false;
 bool idleBlinkActive = false;
 unsigned long nextIdleBlinkMs = 0;
 uint8_t idleBlinkRepeatsLeft = 0;
+
+// Dirty-rect optimisation: skip SPI transfer when frame and color haven't changed
+const unsigned char* lastDrawnBitmap = nullptr;
+uint16_t lastDrawnColor = 0xFFFF; // impossible initial value
 
 // WiFi Info Scrolling
 unsigned long lastInputTime = 0;
@@ -167,31 +171,32 @@ const FaceFpsEntry faceFpsEntries[] = {
   { "idle", 1 },
   { "idle_blink", 7 },
   { "default", 1 },
-  // Conversational faces (manually controlled by Python - no auto-animation)
-  { "happy", 1 },
-  { "talk_happy", 1 },
-  { "sad", 1 },
-  { "talk_sad", 1 },
-  { "angry", 1 },
-  { "talk_angry", 1 },
-  { "surprised", 1 },
-  { "talk_surprised", 1 },
-  { "sleepy", 1 },
-  { "talk_sleepy", 1 },
-  { "love", 1 },
-  { "talk_love", 1 },
-  { "excited", 1 },
-  { "talk_excited", 1 },
-  { "confused", 1 },
-  { "talk_confused", 1 },
-  { "thinking", 1 },
-  { "talk_thinking", 1 },
+  // Conversational & emotional faces (animated!)
+  { "happy", 3 },
+  { "talk_happy", 4 },
+  { "sad", 2 },
+  { "talk_sad", 3 },
+  { "angry", 4 },
+  { "talk_angry", 4 },
+  { "surprised", 3 },
+  { "talk_surprised", 4 },
+  { "sleepy", 2 },
+  { "talk_sleepy", 3 },
+  { "love", 3 },
+  { "talk_love", 4 },
+  { "excited", 4 },
+  { "talk_excited", 5 },
+  { "confused", 3 },
+  { "talk_confused", 4 },
+  { "thinking", 2 },
+  { "talk_thinking", 3 },
 };
 
 
 // Prototypes
 void setServoAngle(uint8_t channel, int angle);
 void updateFaceBitmap(const unsigned char* bitmap);
+void updateFaceBitmap(const unsigned char* bitmap, bool force);
 void setFace(const String& faceName);
 void setFaceMode(FaceAnimMode mode);
 void setFaceWithMode(const String& faceName, FaceAnimMode mode);
@@ -232,6 +237,12 @@ void handleCommandWeb() {
     recordInput();
     exitIdle();
     server.send(200, "text/plain", "OK"); 
+  } 
+  else if (server.hasArg("face")) {
+    setFace(server.arg("face"));
+    recordInput();
+    exitIdle();
+    server.send(200, "text/plain", "OK");
   } 
   else if (server.hasArg("go")) {
     currentCommand = server.arg("go");
@@ -652,12 +663,13 @@ void setup() {
   
   // Shared SPI init for the ST7735 and SD card.
   SPI.begin(TFT_SCK, SD_MISO, TFT_MOSI, TFT_CS);
+  SPI.setFrequency(80000000); // 80 MHz, massimo supportato dal driver
   pinMode(TFT_CS, OUTPUT);
   digitalWrite(TFT_CS, HIGH);
   pinMode(SD_CS, OUTPUT);
   digitalWrite(SD_CS, HIGH);
   display.initR(INITR_BLACKTAB);
-  display.setRotation(0);
+  display.setRotation(1); // 1 = Landscape (160x128). Se l'orientamento fisico e' capovolto, impostare a 3.
   display.fillScreen(ST7735_BLACK);
   
   display.setTextColor(ST7735_WHITE);
@@ -883,18 +895,33 @@ void loop() {
   }
 }
 
-// Function to update the robot's face
-void updateFaceBitmap(const unsigned char* bitmap) {
-  display.fillScreen(ST7735_BLACK);
-  for (int16_t y = 0; y < 64; y++) {
-    for (int16_t x = 0; x < 128; x++) {
-      uint8_t bitmapByte = pgm_read_byte(bitmap + y * 16 + (x >> 3));
-      if (bitmapByte & (0x80 >> (x & 7))) {
-        display.drawPixel(x, y, ST7735_WHITE);
-      }
-    }
-  }
+#ifndef FACE_WIDTH
+#define FACE_WIDTH 160
+#define FACE_HEIGHT 128
+#endif
+
+// Returns appropriate TFT eye color based on emotional state
+uint16_t getFaceColor(const String& faceName) {
+  if (faceName.indexOf("angry") >= 0) return ST7735_RED;
+  if (faceName.indexOf("love") >= 0 || faceName.indexOf("cute") >= 0) return ST7735_MAGENTA;
+  if (faceName.indexOf("excited") >= 0) return ST7735_YELLOW;
+  if (faceName.indexOf("sleepy") >= 0 || faceName.indexOf("rest") >= 0) return ST7735_BLUE;
+  if (faceName.indexOf("dead") >= 0) return ST7735_RED;
+  return ST7735_CYAN; // Default classic vibrant robot cyan
 }
+
+// Function to update the robot's face.
+// Skips the SPI transfer when both the bitmap pointer and the color are
+// identical to what's already on screen — no visible change, no wasted bus time.
+void updateFaceBitmap(const unsigned char* bitmap, bool force) {
+  if (bitmap == nullptr) return;
+  uint16_t color = getFaceColor(currentFaceName);
+  if (!force && bitmap == lastDrawnBitmap && color == lastDrawnColor) return;
+  display.drawBitmap(0, 0, bitmap, FACE_WIDTH, FACE_HEIGHT, color, ST7735_BLACK);
+  lastDrawnBitmap = bitmap;
+  lastDrawnColor  = color;
+}
+void updateFaceBitmap(const unsigned char* bitmap) { updateFaceBitmap(bitmap, false); }
 
 uint8_t countFrames(const unsigned char* const* frames, uint8_t maxFrames) {
   if (frames == nullptr || frames[0] == nullptr) return 0;
@@ -912,6 +939,7 @@ void setFace(const String& faceName) {
   currentFaceName = faceName;
   currentFaceFrameIndex = 0;
   lastFaceFrameMs = 0;
+  currentFaceMode = FACE_ANIM_BOOMERANG;
   faceFrameDirection = 1;
   faceAnimFinished = false;
   currentFaceFps = getFaceFpsForName(faceName);
@@ -935,7 +963,8 @@ void setFace(const String& faceName) {
   }
 
   if (currentFaceFrameCount > 0 && currentFaceFrames[0] != nullptr) {
-    updateFaceBitmap(currentFaceFrames[0]);
+    // force=true: always draw the first frame of a new face regardless of cache
+    updateFaceBitmap(currentFaceFrames[0], true);
   }
 }
 
@@ -1086,56 +1115,12 @@ void recordInput() {
 }
 
 void updateWifiInfoScroll() {
-  // Don't show WiFi info if first input has been received
-  if (firstInputReceived) {
-    if (showingWifiInfo) {
-      showingWifiInfo = false;
-      // Restore the current face
-      if (currentFaceFrames != nullptr && currentFaceFrameCount > 0) {
-        updateFaceBitmap(currentFaceFrames[currentFaceFrameIndex]);
-      }
-    }
-    return;
-  }
-  
-  unsigned long now = millis();
-  
-  // Check if 30 seconds have passed without input
-  if (!showingWifiInfo && (now - lastInputTime >= 30000)) {
-    showingWifiInfo = true;
-    wifiScrollPos = 0;
-    lastWifiScrollMs = now;
-  }
-  
-  if (!showingWifiInfo) return;
-  
-  // Update scroll every 150ms
-  if (now - lastWifiScrollMs >= 150) {
-    lastWifiScrollMs = now;
-    
-    // Clear and redraw with current face in background
-    display.fillScreen(ST7735_BLACK);
-    
-    // Draw the face bitmap in the background
-    if (currentFaceFrames != nullptr && currentFaceFrameCount > 0) {
-      display.drawBitmap(0, 0, currentFaceFrames[currentFaceFrameIndex], 128, 64, ST7735_WHITE, ST7735_BLACK);
-    }
-    
-    // Draw black bar for text background on top row
-    display.fillRect(0, 0, 128, 10, ST7735_BLACK);
-    
-    // Draw scrolling text
-    display.setTextSize(1);
-    display.setTextColor(ST7735_WHITE);
-    display.setTextWrap(false);
-    display.setCursor(-wifiScrollPos, 1);
-    display.print(wifiInfoText);
-    display.setTextWrap(true);
-    
-    // Advance scroll position
-    wifiScrollPos += 2;
-    if (wifiScrollPos >= (int)(wifiInfoText.length() * 6)) {
-      wifiScrollPos = 0;
-    }
-  }
+  // WiFi SSID/AP information display has been intentionally disabled to avoid
+  // the display clear/redraw flicker and to keep the idle/boomerang face
+  // animation stable while the robot is sleeping or resting.
+  // The SSID and network info are no longer rendered on the TFT.
+  showingWifiInfo = false;
+  wifiScrollPos = 0;
+  lastWifiScrollMs = millis();
+  return;
 }
