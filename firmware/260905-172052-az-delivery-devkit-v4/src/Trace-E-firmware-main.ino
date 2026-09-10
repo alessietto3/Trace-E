@@ -8,7 +8,7 @@
 #include <ESP32Servo.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_ST7735.h>
-#include "face-bitmaps.h"
+#include "face-bitmaps-tft.h"
 #include "movement-sequences.h"
 #include "captive-portal.h"
 
@@ -657,7 +657,7 @@ void setup() {
   pinMode(SD_CS, OUTPUT);
   digitalWrite(SD_CS, HIGH);
   display.initR(INITR_BLACKTAB);
-  display.setRotation(0);
+  display.setRotation(1); // 1 = Landscape (160x128). Se l'orientamento fisico e' capovolto, impostare a 3.
   display.fillScreen(ST7735_BLACK);
   
   display.setTextColor(ST7735_WHITE);
@@ -883,17 +883,26 @@ void loop() {
   }
 }
 
+#ifndef FACE_WIDTH
+#define FACE_WIDTH 160
+#define FACE_HEIGHT 128
+#endif
+
+// Returns appropriate TFT eye color based on emotional state
+uint16_t getFaceColor(const String& faceName) {
+  if (faceName.indexOf("angry") >= 0) return ST7735_RED;
+  if (faceName.indexOf("love") >= 0 || faceName.indexOf("cute") >= 0) return ST7735_MAGENTA;
+  if (faceName.indexOf("excited") >= 0) return ST7735_YELLOW;
+  if (faceName.indexOf("sleepy") >= 0 || faceName.indexOf("rest") >= 0) return ST7735_BLUE;
+  if (faceName.indexOf("dead") >= 0) return ST7735_RED;
+  return ST7735_CYAN; // Default classic vibrant robot cyan
+}
+
 // Function to update the robot's face
 void updateFaceBitmap(const unsigned char* bitmap) {
-  display.fillScreen(ST7735_BLACK);
-  for (int16_t y = 0; y < 64; y++) {
-    for (int16_t x = 0; x < 128; x++) {
-      uint8_t bitmapByte = pgm_read_byte(bitmap + y * 16 + (x >> 3));
-      if (bitmapByte & (0x80 >> (x & 7))) {
-        display.drawPixel(x, y, ST7735_WHITE);
-      }
-    }
-  }
+  if (bitmap == nullptr) return;
+  uint16_t color = getFaceColor(currentFaceName);
+  display.drawBitmap(0, 0, bitmap, FACE_WIDTH, FACE_HEIGHT, color, ST7735_BLACK);
 }
 
 uint8_t countFrames(const unsigned char* const* frames, uint8_t maxFrames) {
@@ -1118,11 +1127,11 @@ void updateWifiInfoScroll() {
     
     // Draw the face bitmap in the background
     if (currentFaceFrames != nullptr && currentFaceFrameCount > 0) {
-      display.drawBitmap(0, 0, currentFaceFrames[currentFaceFrameIndex], 128, 64, ST7735_WHITE, ST7735_BLACK);
+      display.drawBitmap(0, 0, currentFaceFrames[currentFaceFrameIndex], FACE_WIDTH, FACE_HEIGHT, getFaceColor(currentFaceName), ST7735_BLACK);
     }
     
     // Draw black bar for text background on top row
-    display.fillRect(0, 0, 128, 10, ST7735_BLACK);
+    display.fillRect(0, 0, FACE_WIDTH, 10, ST7735_BLACK);
     
     // Draw scrolling text
     display.setTextSize(1);
