@@ -14,7 +14,7 @@
 
 // --- Access Point Configuration ---
 // This is the network the Robot will create
-#define AP_SSID  "Sesame-Controller"
+#define AP_SSID  "Trace-E-Controller"
 #define AP_PASS  "12345678" // Must be at least 8 characters
 
 // --- Station Mode Configuration (Optional) ---
