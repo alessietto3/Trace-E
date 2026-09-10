@@ -62,6 +62,10 @@ bool idleBlinkActive = false;
 unsigned long nextIdleBlinkMs = 0;
 uint8_t idleBlinkRepeatsLeft = 0;
 
+// Dirty-rect optimisation: skip SPI transfer when frame and color haven't changed
+const unsigned char* lastDrawnBitmap = nullptr;
+uint16_t lastDrawnColor = 0xFFFF; // impossible initial value
+
 // WiFi Info Scrolling
 unsigned long lastInputTime = 0;
 bool firstInputReceived = false;
@@ -192,6 +196,7 @@ const FaceFpsEntry faceFpsEntries[] = {
 // Prototypes
 void setServoAngle(uint8_t channel, int angle);
 void updateFaceBitmap(const unsigned char* bitmap);
+void updateFaceBitmap(const unsigned char* bitmap, bool force);
 void setFace(const String& faceName);
 void setFaceMode(FaceAnimMode mode);
 void setFaceWithMode(const String& faceName, FaceAnimMode mode);
@@ -658,6 +663,7 @@ void setup() {
   
   // Shared SPI init for the ST7735 and SD card.
   SPI.begin(TFT_SCK, SD_MISO, TFT_MOSI, TFT_CS);
+  SPI.setFrequency(80000000); // 80 MHz, massimo supportato dal driver
   pinMode(TFT_CS, OUTPUT);
   digitalWrite(TFT_CS, HIGH);
   pinMode(SD_CS, OUTPUT);
@@ -904,12 +910,18 @@ uint16_t getFaceColor(const String& faceName) {
   return ST7735_CYAN; // Default classic vibrant robot cyan
 }
 
-// Function to update the robot's face
-void updateFaceBitmap(const unsigned char* bitmap) {
+// Function to update the robot's face.
+// Skips the SPI transfer when both the bitmap pointer and the color are
+// identical to what's already on screen — no visible change, no wasted bus time.
+void updateFaceBitmap(const unsigned char* bitmap, bool force) {
   if (bitmap == nullptr) return;
   uint16_t color = getFaceColor(currentFaceName);
+  if (!force && bitmap == lastDrawnBitmap && color == lastDrawnColor) return;
   display.drawBitmap(0, 0, bitmap, FACE_WIDTH, FACE_HEIGHT, color, ST7735_BLACK);
+  lastDrawnBitmap = bitmap;
+  lastDrawnColor  = color;
 }
+void updateFaceBitmap(const unsigned char* bitmap) { updateFaceBitmap(bitmap, false); }
 
 uint8_t countFrames(const unsigned char* const* frames, uint8_t maxFrames) {
   if (frames == nullptr || frames[0] == nullptr) return 0;
@@ -950,7 +962,8 @@ void setFace(const String& faceName) {
   }
 
   if (currentFaceFrameCount > 0 && currentFaceFrames[0] != nullptr) {
-    updateFaceBitmap(currentFaceFrames[0]);
+    // force=true: always draw the first frame of a new face regardless of cache
+    updateFaceBitmap(currentFaceFrames[0], true);
   }
 }
 
