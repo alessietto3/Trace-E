@@ -171,25 +171,25 @@ const FaceFpsEntry faceFpsEntries[] = {
   { "idle", 1 },
   { "idle_blink", 7 },
   { "default", 1 },
-  // Conversational faces (manually controlled by Python - no auto-animation)
-  { "happy", 1 },
-  { "talk_happy", 1 },
-  { "sad", 1 },
-  { "talk_sad", 1 },
-  { "angry", 1 },
-  { "talk_angry", 1 },
-  { "surprised", 1 },
-  { "talk_surprised", 1 },
-  { "sleepy", 1 },
-  { "talk_sleepy", 1 },
-  { "love", 1 },
-  { "talk_love", 1 },
-  { "excited", 1 },
-  { "talk_excited", 1 },
-  { "confused", 1 },
-  { "talk_confused", 1 },
-  { "thinking", 1 },
-  { "talk_thinking", 1 },
+  // Conversational & emotional faces (animated!)
+  { "happy", 3 },
+  { "talk_happy", 4 },
+  { "sad", 2 },
+  { "talk_sad", 3 },
+  { "angry", 4 },
+  { "talk_angry", 4 },
+  { "surprised", 3 },
+  { "talk_surprised", 4 },
+  { "sleepy", 2 },
+  { "talk_sleepy", 3 },
+  { "love", 3 },
+  { "talk_love", 4 },
+  { "excited", 4 },
+  { "talk_excited", 5 },
+  { "confused", 3 },
+  { "talk_confused", 4 },
+  { "thinking", 2 },
+  { "talk_thinking", 3 },
 };
 
 
@@ -939,6 +939,7 @@ void setFace(const String& faceName) {
   currentFaceName = faceName;
   currentFaceFrameIndex = 0;
   lastFaceFrameMs = 0;
+  currentFaceMode = FACE_ANIM_BOOMERANG;
   faceFrameDirection = 1;
   faceAnimFinished = false;
   currentFaceFps = getFaceFpsForName(faceName);
@@ -1114,56 +1115,12 @@ void recordInput() {
 }
 
 void updateWifiInfoScroll() {
-  // Don't show WiFi info if first input has been received
-  if (firstInputReceived) {
-    if (showingWifiInfo) {
-      showingWifiInfo = false;
-      // Restore the current face
-      if (currentFaceFrames != nullptr && currentFaceFrameCount > 0) {
-        updateFaceBitmap(currentFaceFrames[currentFaceFrameIndex]);
-      }
-    }
-    return;
-  }
-  
-  unsigned long now = millis();
-  
-  // Check if 30 seconds have passed without input
-  if (!showingWifiInfo && (now - lastInputTime >= 30000)) {
-    showingWifiInfo = true;
-    wifiScrollPos = 0;
-    lastWifiScrollMs = now;
-  }
-  
-  if (!showingWifiInfo) return;
-  
-  // Update scroll every 150ms
-  if (now - lastWifiScrollMs >= 150) {
-    lastWifiScrollMs = now;
-    
-    // Clear and redraw with current face in background
-    display.fillScreen(ST7735_BLACK);
-    
-    // Draw the face bitmap in the background
-    if (currentFaceFrames != nullptr && currentFaceFrameCount > 0) {
-      display.drawBitmap(0, 0, currentFaceFrames[currentFaceFrameIndex], FACE_WIDTH, FACE_HEIGHT, getFaceColor(currentFaceName), ST7735_BLACK);
-    }
-    
-    // Draw black bar for text background on top row
-    display.fillRect(0, 0, FACE_WIDTH, 10, ST7735_BLACK);
-    
-    // Draw scrolling text
-    display.setTextSize(1);
-    display.setTextColor(ST7735_WHITE);
-    display.setTextWrap(false);
-    display.setCursor(-wifiScrollPos, 1);
-    display.print(wifiInfoText);
-    display.setTextWrap(true);
-    
-    // Advance scroll position
-    wifiScrollPos += 2;
-    if (wifiScrollPos >= (int)(wifiInfoText.length() * 6)) {
-      wifiScrollPos = 0;
-    }
-  }
+  // WiFi SSID/AP information display has been intentionally disabled to avoid
+  // the display clear/redraw flicker and to keep the idle/boomerang face
+  // animation stable while the robot is sleeping or resting.
+  // The SSID and network info are no longer rendered on the TFT.
+  showingWifiInfo = false;
+  wifiScrollPos = 0;
+  lastWifiScrollMs = millis();
+  return;
 }
