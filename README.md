@@ -119,6 +119,57 @@ The ESP32 firmware (`sesame-firmware-main.ino`) handles the kinematics, face dis
 
 ---
 
+## Robot Eyes & Expression Library (TFT 160x128 Landscape)
+
+Trace-E features an expressive robotic eye system designed for 128x160 color TFT displays (ST7735) in Landscape orientation (**160x128 pixels**), as well as backwards compatibility with 128x64 monochrome OLEDs.
+
+The eyes are styled after modern interactive companion robots (*Cozmo*, *Vector*, *Wall-E*), with large luminous capsule eyes, organic eyelid curves, and dynamic emotion-based color rendering:
+
+### Moods & Emotional Expressions
+
+| Face Name | Mood / Meaning | TFT Eye Color | Visual Description |
+|-----------|----------------|---------------|--------------------|
+| `idle` / `defualt` | Neutral / Normal | **Cyan** (`ST7735_CYAN`) | Friendly, attentive large rounded capsules (standard robot eyes) |
+| `idle_blink` | Eye Blink (4-frame anim) | **Cyan** (`ST7735_CYAN`) | Natural blinking animation (open → upper lid lower → slit → re-open) |
+| `happy` | Happy / Cheerful | **Cyan** (`ST7735_CYAN`) | Wide smiling upward arches (`^_^`) with raised cheeks |
+| `angry` | Angry / Stern | **Red** (`ST7735_RED`) | Sharp inward slanted brows (`\ /`) with intense focused glare |
+| `sad` | Sad / Apologetic | **Cyan** (`ST7735_CYAN`) | Downward drooping upper eyelids (`/ \`) with sorrowful look |
+| `surprised` | Surprised / Shocked | **Cyan** (`ST7735_CYAN`) | Giant tall rounded pill eyes (`O O`) with wide open circular pupils |
+| `sleepy` | Sleepy / Drowsy | **Blue** (`ST7735_BLUE`) | Heavy droopy eyelids covering 70% of the eyes |
+| `love` | In Love / Heart-eyes | **Magenta** (`ST7735_MAGENTA`) | Glowing symmetrical digital hearts (`<3 <3`) |
+| `excited` | Excited / Thrilled | **Yellow** (`ST7735_YELLOW`) | Wide open joyful eyes with sparkling 8-point stars inside |
+| `confused` | Confused / Skeptical | **Cyan** (`ST7735_CYAN`) | Asymmetrical "Huh?" (left eye tall & arched, right eye squinted flat `o _`) |
+| `thinking` / `thinking_2` | Thinking / Pondering | **Cyan** (`ST7735_CYAN`) | Eyes glancing up and to the top-right corner |
+| `cute` | Kawaii / Adorable | **Magenta** (`ST7735_MAGENTA`) | Anime eyes with double circular shine glints and blush marks below |
+| `dead` / `dead_1` / `dead_2` | Knocked Out / Off | **Red** (`ST7735_RED`) | Bold `X X` crossed eyes, glitch frames, and flatline dashes (`- -`) |
+| `freaky` | Hypnotic / Dizzy | **Cyan** (`ST7735_CYAN`) | Concentric circular hypnotic rings (`@ @`) |
+| `stand` | Alert / Standing | **Cyan** (`ST7735_CYAN`) | Upright, slightly taller alert capsule eyes |
+
+### Action & Movement Faces
+
+Synchronized with movement sequences and poses:
+
+| Face Name | Movement / Pose | TFT Eye Color | Description |
+|-----------|-----------------|---------------|-------------|
+| `walk` | Walking Forward | **Cyan** (`ST7735_CYAN`) | Focused forward gaze with slight motion slant |
+| `rest` / `rest_1` / `rest_2` | Sleeping / Resting | **Blue** (`ST7735_BLUE`) | Peaceful downward curved closed eyes (`u u`) with floating `z Z` |
+| `wave` | Waving / Greeting | **Cyan** (`ST7735_CYAN`) | Left happy arch eye paired with a winking sparkle star eye |
+| `dance` / `dance_1` | Dancing / Grooving | **Cyan** (`ST7735_CYAN`) | Alternating playful winking arches to the rhythm of the music |
+| `swim` | Swimming Pose | **Cyan** (`ST7735_CYAN`) | Hydrodynamic curved visor with bridge connection |
+| `point` / `point_1` / `point_2` | Pointing / Tracking | **Cyan** (`ST7735_CYAN`) | Eyes shifting sharply to the right following pointed direction |
+| `pushup` | Pushup Exercise | **Cyan** (`ST7735_CYAN`) | Tightly squinted grit eyes (`> <`) under heavy effort |
+| `bow` | Polite Bow | **Cyan** (`ST7735_CYAN`) | Downward angled respectful closed curves (`v v`) |
+| `shake` | Body Shake | **Cyan** (`ST7735_CYAN`) | Jittered offset eyes with vibration speed lines |
+| `worm` | Worm Motion | **Cyan** (`ST7735_CYAN`) | Playful wavy undulating sine-curve eyes |
+| `crab` | Crab Walk | **Cyan** (`ST7735_CYAN`) | Sideways peeking eyes looking hard toward the flank |
+| `shrug` | Shrugging | **Cyan** (`ST7735_CYAN`) | Skeptical side-glance with raised eyebrow and smirk |
+
+### Conversational / Talk Variants
+
+Each core emotion includes an animated speech counterpart (`talk_happy`, `talk_angry`, `talk_sad`, `talk_surprised`, `talk_sleepy`, `talk_love`, `talk_excited`, `talk_confused`, `talk_thinking`). In the Web Interface, toggling **Talk Mode** automatically triggers speech-animated eye variants!
+
+---
+
 ## Contributing
 
 This robot is a platform for building new features, cosmetics, tools, and ideas. Since the current firmware is a basic implementation, pull requests are very welcome for:

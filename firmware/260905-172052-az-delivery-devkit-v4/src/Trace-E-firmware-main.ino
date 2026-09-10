@@ -233,6 +233,12 @@ void handleCommandWeb() {
     exitIdle();
     server.send(200, "text/plain", "OK"); 
   } 
+  else if (server.hasArg("face")) {
+    setFace(server.arg("face"));
+    recordInput();
+    exitIdle();
+    server.send(200, "text/plain", "OK");
+  } 
   else if (server.hasArg("go")) {
     currentCommand = server.arg("go");
     recordInput();

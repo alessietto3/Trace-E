@@ -148,6 +148,17 @@ const char index_html[] PROGMEM = R"rawliteral(
     .btn-pose:active { 
       background: linear-gradient(145deg, var(--content-color-dark), var(--content-color-darker));
     }
+    .btn-face { 
+      background: linear-gradient(145deg, #1f4068, #162447);
+      border: 1px solid #3282b8;
+      padding: 10px 4px;
+      font-size: 13px;
+      color: #fff;
+    }
+    .btn-face:active { 
+      background: linear-gradient(145deg, #162447, #0f182e);
+      transform: translateY(2px);
+    }
     
     /* Special Buttons */
     .btn-stop-all { 
@@ -408,6 +419,35 @@ const char index_html[] PROGMEM = R"rawliteral(
     </div>
 
     <div class="section-column">
+      <!-- Robot Faces & Moods Section -->
+      <div class="section">
+        <div class="section-title">Robot Faces & Moods</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:13px; color:#bbb;">
+          <span>Talk Animation:</span>
+          <label style="display:inline-flex; align-items:center; cursor:pointer;">
+            <input type="checkbox" id="talkModeToggle" style="width:auto; margin-right:6px;" onchange="toggleTalkMode()">
+            <span>Talk Mode</span>
+          </label>
+        </div>
+        <div class="grid">
+          <button class="btn-face" onclick="faceBtn('happy')">&#128522; Happy</button>
+          <button class="btn-face" onclick="faceBtn('angry')">&#128545; Angry</button>
+          <button class="btn-face" onclick="faceBtn('sad')">&#128546; Sad</button>
+          <button class="btn-face" onclick="faceBtn('surprised')">&#128558; Surprised</button>
+          <button class="btn-face" onclick="faceBtn('sleepy')">&#128564; Sleepy</button>
+          <button class="btn-face" onclick="faceBtn('love')">&#10084;&#65039; Love</button>
+          <button class="btn-face" onclick="faceBtn('excited')">&#129321; Excited</button>
+          <button class="btn-face" onclick="faceBtn('confused')">&#129300; Confused</button>
+          <button class="btn-face" onclick="faceBtn('thinking')">&#129488; Thinking</button>
+          <button class="btn-face" onclick="faceBtn('cute')">&#10024; Cute</button>
+          <button class="btn-face" onclick="faceBtn('dead')">&#128128; Dead</button>
+          <button class="btn-face" onclick="faceBtn('freaky')">&#127744; Freaky</button>
+          <button class="btn-face" onclick="faceBtn('idle')">&#128528; Idle</button>
+          <button class="btn-face" onclick="faceBtn('idle_blink')">&#128065;&#65039; Blink</button>
+          <button class="btn-face" onclick="faceBtn('stand')">&#129302; Stand</button>
+        </div>
+      </div>
+
       <!-- Settings & Status Section -->
       <div class="section">
         <div class="section-title">System</div>
@@ -635,6 +675,30 @@ function pose(name) {
   incrementQueue();
   lockMotors(3000);
   fetch('/cmd?pose=' + name).catch(console.log); 
+}
+
+let talkModeActive = false;
+
+function toggleTalkMode() {
+  const toggle = document.getElementById('talkModeToggle');
+  talkModeActive = toggle ? toggle.checked : false;
+}
+
+function faceBtn(name) {
+  if (talkModeActive) {
+    const talkSupported = ['happy', 'sad', 'angry', 'surprised', 'sleepy', 'love', 'excited', 'confused', 'thinking'];
+    if (talkSupported.includes(name)) {
+      setFaceWeb('talk_' + name);
+      return;
+    }
+  }
+  setFaceWeb(name);
+}
+
+function setFaceWeb(name) {
+  if (!canSendCommand()) return;
+  incrementQueue();
+  fetch('/cmd?face=' + name).catch(console.log);
 }
 
 function updateMotor(motorNum, value) {
