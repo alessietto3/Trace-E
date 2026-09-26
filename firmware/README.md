@@ -718,6 +718,28 @@ The firmware abstracts pin definitions via the `servoPins` array. The default co
 
 ### Pin Configuration Tables
 
+#### ESP32-WROOM-32 (AZ-Delivery DevKit V4 / Trace-E)
+
+Configurazione dedicata per **ESP32-WROOM-32** (usata in `Trace-E-firmware-main.ino` con display ST7735 SPI e MicroSD):
+
+| Motor/Component       | Array Index | GPIO Pin | Posizione / Note                                  |
+| --------------------- | ----------- | -------- | ------------------------------------------------- |
+| Motor 0               | 0           | **13**   | R1 (Anca Anteriore Destra / Front-Right Hip)      |
+| Motor 1               | 1           | **12**   | R2 (Anca Posteriore Destra / Rear-Right Hip)      |
+| Motor 2               | 2           | **14**   | L1 (Anca Anteriore Sinistra / Front-Left Hip)     |
+| Motor 3               | 3           | **27**   | L2 (Anca Posteriore Sinistra / Rear-Left Hip)     |
+| Motor 4               | 4           | **26**   | R4 (Gamba Posteriore Destra / Rear-Right Leg)     |
+| Motor 5               | 5           | **25**   | R3 (Gamba Anteriore Destra / Front-Right Leg)     |
+| Motor 6               | 6           | **33**   | L3 (Gamba Anteriore Sinistra / Front-Left Leg)    |
+| Motor 7               | 7           | **32**   | L4 (Gamba Posteriore Sinistra / Rear-Left Leg)    |
+| **TFT CS**            | -           | **17**   | Display ST7735 Chip Select                        |
+| **TFT RST**           | -           | **16**   | Display ST7735 Reset                              |
+| **TFT DC**            | -           | **4**    | Display ST7735 Data/Command                       |
+| **TFT/SD SCK**        | -           | **18**   | SPI Clock (condiviso TFT e SD)                    |
+| **TFT/SD MOSI**       | -           | **23**   | SPI MOSI (condiviso TFT e SD)                     |
+| **SD CS**             | -           | **5**    | MicroSD Chip Select                               |
+| **SD MISO**           | -           | **19**   | MicroSD SPI MISO                                  |
+
 #### Lolin S2 Mini (ESP32-S2)
 
 | Motor/Component   | Array Index | GPIO Pin     | Notes                        |

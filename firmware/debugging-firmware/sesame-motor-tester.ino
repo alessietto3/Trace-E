@@ -8,8 +8,12 @@
 Servo servos[8];
 
 // Motor Pin Mapping
-// Index: 0  1  2  3  4   5   6   7
-const int servoPins[8] = {1, 2, 4, 6, 8, 10, 13, 14};
+// Index: 0   1   2   3   4   5   6   7
+// Joint: R1  R2  L1  L2  R4  R3  L3  L4
+// ESP32-WROOM-32 (AZ-Delivery DevKit V4):
+const int servoPins[8] = {13, 12, 14, 27, 26, 25, 33, 32};
+// Lolin S2 Mini: (uncomment if needed)
+// const int servoPins[8] = {1, 2, 4, 6, 8, 10, 13, 14};
 // Distro board V3 pins: (uncomment if needed)
 // const int servoPins[8] = {4, 5, 6, 7, 10, 11, 12, 13};
 // Distro board V2 pins: (uncomment if needed)

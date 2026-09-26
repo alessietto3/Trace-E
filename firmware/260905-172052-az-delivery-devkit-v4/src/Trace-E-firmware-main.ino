@@ -93,27 +93,35 @@ bool wifiRestoreApOnly = false;      // drop the station iface again after an AP
 const uint32_t WIFI_CONNECT_TIMEOUT_MS = 15000;
 const uint32_t WIFI_SETUP_START_DELAY_MS = 300;  // let the HTTP response flush before the AP channel may hop
 
-// Servo Pins for the current ESP32 DevKit V4 setup
+// Servo Pins for the current ESP32-WROOM-32 / DevKit V4 setup
 // ======================================================================
-// Confirmed free GPIOs suitable for servo control on this board:
-// 13, 12, 14, 27, 26, 25, 33, 32
-// They are all valid output-capable ESP32 GPIOs and are not used by the
-// TFT/SD lines already assigned in this sketch.
+// PINOUT TABLE (ESP32-WROOM-32 / AZ-Delivery DevKit V4):
+// ----------------------------------------------------------------------
+// | Indice | Giunto | Posizione Fisica            | Pin GPIO ESP32 |
+// | :---:  | :---   | :---                        | :---:          |
+// |   0    |   R1   | Anca Anteriore Destra (FRH) | GPIO 13        |
+// |   1    |   R2   | Anca Posteriore Destra (RRH)| GPIO 12        |
+// |   2    |   L1   | Anca Anteriore Sinistra(FLH)| GPIO 14        |
+// |   3    |   L2   | Anca Posteriore Sinistra(RLH| GPIO 27        |
+// |   4    |   R4   | Gamba Posteriore Destra(RRL)| GPIO 26        |
+// |   5    |   R3   | Gamba Anteriore Destra (FRL)| GPIO 25        |
+// |   6    |   L3   | Gamba Anteriore Sinistra(FLL| GPIO 33        |
+// |   7    |   L4   | Gamba Posteriore Sinistra(RLL GPIO 32        |
+// ----------------------------------------------------------------------
+// Display ST7735 SPI: CS=17, RST=16, DC=4, SCK=18, MOSI=23
+// MicroSD SPI:        CS=5, MISO=19 (SCK=18, MOSI=23 in comune con TFT)
 // ======================================================================
 Servo servos[8];
 
-// Historical pinout references kept for documentation only.
-// Sesame Distro Board V3 Pinout [NEW]
-//const int servoPins[8] = {4, 5, 6, 7, 10, 11, 12, 13};
+// Historical pinout references kept for documentation only:
+// Sesame Distro Board V3 Pinout: const int servoPins[8] = {4, 5, 6, 7, 10, 11, 12, 13};
+// Sesame Distro Board V2 Pinout: const int servoPins[8] = {4, 5, 6, 7, 15, 16, 17, 18};
+// Sesame Distro Board V1 Pinout: const int servoPins[8] = {15, 2, 23, 19, 4, 16, 17, 18};
+// Lolin S2 Mini Pinout:          const int servoPins[8] = {1, 2, 4, 6, 8, 10, 13, 14};
 
-// Sesame Distro Board V2 Pinout (Legacy)
-//const int servoPins[8] = {4, 5, 6, 7, 15, 16, 17, 18};
-
-// Sesame Distro Board V1 Pinout (Legacy)
-//const int servoPins[8] = {15, 2, 23, 19, 4, 16, 17, 18};
-
-// Current dedicated servo map for the free GPIOs above.
+// Active configuration for ESP32-WROOM-32:
 const int servoPins[8] = {13, 12, 14, 27, 26, 25, 33, 32};
+
 
 // Subtrim values for each servo (offset in degrees)
 int8_t servoSubtrim[8] = {0, 0, 0, 0, 0, 0, 0, 0};
