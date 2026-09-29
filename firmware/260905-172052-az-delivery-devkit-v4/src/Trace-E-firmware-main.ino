@@ -11,6 +11,7 @@
 #include "face-bitmaps-tft.h"
 #include "movement-sequences.h"
 #include "captive-portal.h"
+#include "secret.h"
 
 // --- Access Point Configuration ---
 // This is the network the Robot will create
@@ -20,9 +21,9 @@
 // --- Station Mode Configuration (Optional) ---
 // Set these to connect to your home/office WiFi network
 // Leave NETWORK_SSID empty to disable station mode
-#define NETWORK_SSID ""  // Your WiFi network name
-#define NETWORK_PASS ""  // Your WiFi password
-#define ENABLE_NETWORK_MODE false  // Set to true to enable network connection attempts
+#define NETWORK_SSID WIFI_SSID  // Your WiFi network name inside secret.h
+#define NETWORK_PASS WIFI_PASSWORD  // Your WiFi password inside secret.h
+#define ENABLE_NETWORK_MODE true  // Set to true to enable network connection attempts
 
 // ST7735 SPI display pins
 #define TFT_CS 17
@@ -99,14 +100,14 @@ const uint32_t WIFI_SETUP_START_DELAY_MS = 300;  // let the HTTP response flush 
 // ----------------------------------------------------------------------
 // | Indice | Giunto | Posizione Fisica            | Pin GPIO ESP32 |
 // | :---:  | :---   | :---                        | :---:          |
-// |   0    |   R1   | Anca Anteriore Destra (FRH) | GPIO 13        |
-// |   1    |   R2   | Anca Posteriore Destra (RRH)| GPIO 12        |
-// |   2    |   L1   | Anca Anteriore Sinistra(FLH)| GPIO 14        |
-// |   3    |   L2   | Anca Posteriore Sinistra(RLH| GPIO 27        |
-// |   4    |   R4   | Gamba Posteriore Destra(RRL)| GPIO 26        |
-// |   5    |   R3   | Gamba Anteriore Destra (FRL)| GPIO 25        |
-// |   6    |   L3   | Gamba Anteriore Sinistra(FLL| GPIO 33        |
-// |   7    |   L4   | Gamba Posteriore Sinistra(RLL GPIO 32        |
+// |   0    |   R1   | Anca Anteriore Destra (FRH) | GPIO 13        |V
+// |   1    |   R2   | Anca Posteriore Destra (RRH)| GPIO 12        |V
+// |   2    |   L1   | Anca Anteriore Sinistra(FLH)| GPIO 14        |V
+// |   3    |   L2   | Anca Posteriore Sinistra(RLH| GPIO 27        |V
+// |   4    |   R4   | Gamba Posteriore Destra(RRL)| GPIO 26        |V
+// |   5    |   R3   | Gamba Anteriore Destra (FRL)| GPIO 25        |V
+// |   6    |   L3   | Gamba Anteriore Sinistra(FLL| GPIO 33        |V
+// |   7    |   L4   | Gamba Posteriore Sinistra(RLL GPIO 32        |V
 // ----------------------------------------------------------------------
 // Display ST7735 SPI: CS=17, RST=16, DC=4, SCK=18, MOSI=23
 // MicroSD SPI:        CS=5, MISO=19 (SCK=18, MOSI=23 in comune con TFT)
