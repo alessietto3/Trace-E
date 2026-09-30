@@ -535,6 +535,100 @@ bool startMdns() {
   return mdnsOk;
 }
 
+static int lastOtaPercent = -1;
+
+void drawOtaStart() {
+  lastOtaPercent = -1;
+  // Detach all servos to avoid current draw and twitching during flash writing
+  for (int i = 0; i < 8; i++) {
+    servos[i].detach();
+  }
+  display.fillScreen(ST7735_BLACK);
+
+  // Header Banner
+  display.fillRoundRect(8, 4, 144, 20, 4, 0x1A2F); // Dark blue banner
+  display.drawRoundRect(8, 4, 144, 20, 4, ST7735_CYAN);
+  display.setTextColor(ST7735_WHITE);
+  display.setTextSize(1);
+  display.setCursor(20, 10);
+  display.print(F("BRAIN UPGRADE (OTA)"));
+
+  // Robot Eyes (Downloading mood / Matrix eyes)
+  display.drawRoundRect(34, 30, 38, 28, 6, ST7735_CYAN);
+  display.drawRoundRect(88, 30, 38, 28, 6, ST7735_CYAN);
+
+  // Progress Bar Frame
+  display.drawRoundRect(14, 72, 132, 16, 4, 0x7BEF); // Gray border
+  display.drawRoundRect(15, 73, 130, 14, 3, ST7735_WHITE);
+
+  // Subtitle
+  display.setTextColor(ST7735_YELLOW, ST7735_BLACK);
+  display.setCursor(18, 96);
+  display.print(F("Flashing New Brain..."));
+}
+
+void drawOtaProgress(unsigned int progress, unsigned int total) {
+  if (total == 0) return;
+  int percent = (progress * 100) / total;
+  if (percent == lastOtaPercent && percent < 100) return;
+  lastOtaPercent = percent;
+
+  // Progress bar fill (max width = 126px)
+  int barW = (percent * 126) / 100;
+  if (barW > 0) {
+    display.fillRect(17, 75, barW, 10, ST7735_GREEN);
+  }
+  if (barW < 126) {
+    display.fillRect(17 + barW, 75, 126 - barW, 10, ST7735_BLACK);
+  }
+
+  // Eye scanning animation (fill inside eyes from top to bottom based on progress)
+  int eyeFillH = (percent * 22) / 100;
+  if (eyeFillH > 0) {
+    display.fillRect(37, 33, 32, eyeFillH, ST7735_CYAN);
+    display.fillRect(91, 33, 32, eyeFillH, ST7735_CYAN);
+  }
+
+  // Numeric percentage text
+  display.setTextColor(ST7735_GREEN, ST7735_BLACK);
+  display.setTextSize(1);
+  display.setCursor(68, 112);
+  display.printf("%3d%%", percent);
+}
+
+void drawOtaEnd() {
+  display.fillScreen(ST7735_BLACK);
+
+  // Happy celebration badge
+  display.fillRoundRect(10, 18, 140, 36, 6, ST7735_GREEN);
+  display.setTextColor(ST7735_BLACK, ST7735_GREEN);
+  display.setTextSize(2);
+  display.setCursor(20, 28);
+  display.print(F("UPDATE OK!"));
+
+  display.setTextColor(ST7735_CYAN, ST7735_BLACK);
+  display.setTextSize(1);
+  display.setCursor(30, 68);
+  display.print(F("Rebooting robot..."));
+
+  display.setTextColor(ST7735_WHITE, ST7735_BLACK);
+  display.setCursor(38, 88);
+  display.print(F("See you soon!"));
+}
+
+void drawOtaError(ota_error_t error) {
+  display.fillScreen(ST7735_RED);
+  display.setTextColor(ST7735_WHITE, ST7735_RED);
+  display.setTextSize(2);
+  display.setCursor(15, 25);
+  display.print(F("OTA ERROR!"));
+  display.setTextSize(1);
+  display.setCursor(20, 60);
+  display.printf("Error Code: %u", error);
+  display.setCursor(20, 80);
+  display.print(F("Rebooting..."));
+}
+
 void startOta() {
   if (otaStarted || !networkConnected || WiFi.status() != WL_CONNECTED) return;
 
@@ -542,12 +636,18 @@ void startOta() {
   ArduinoOTA.setPassword(OTA_PASSWORD);
   ArduinoOTA.onStart([]() {
     Serial.println(F("OTA update started."));
+    drawOtaStart();
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    drawOtaProgress(progress, total);
   });
   ArduinoOTA.onEnd([]() {
     Serial.println(F("OTA update complete; rebooting."));
+    drawOtaEnd();
   });
   ArduinoOTA.onError([](ota_error_t error) {
     Serial.printf("OTA error [%u]\n", error);
+    drawOtaError(error);
   });
   ArduinoOTA.begin();
   otaStarted = true;
