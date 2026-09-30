@@ -323,107 +323,194 @@ inline void runCrabPose() {
 }
 
 // --- MOVEMENT ANIMATIONS ---
+// Robust 2-phase diagonal trot gait optimized for low-friction/plastic feet
 inline void runWalkPose() {
   Serial.println(F("WALK FWD"));
   setFaceWithMode("walk", FACE_ANIM_ONCE);
-  // Initial Step
-  setServoAngle(R3, 135); setServoAngle(L3, 45);
-  setServoAngle(R2, 100); setServoAngle(L1, 25);
-  if (!pressingCheck("forward", frameDelay)) return;
   
   for (int i = 0; i < walkCycles; i++) {
-    setServoAngle(R3, 135); setServoAngle(L3, 0);
-    if (!pressingCheck("forward", frameDelay)) return;
-    setServoAngle(L4, 135); setServoAngle(L2, 90);
-    setServoAngle(R4, 0); setServoAngle(R1, 180);
-    if (!pressingCheck("forward", frameDelay)) return;    
-    setServoAngle(R2, 45); setServoAngle(L1, 90);
-    if (!pressingCheck("forward", frameDelay)) return;
-    setServoAngle(R4, 45); setServoAngle(L4, 180);
-    if (!pressingCheck("forward", frameDelay)) return;
-    setServoAngle(R3, 180); setServoAngle(L3, 45);
-    setServoAngle(R2, 90); setServoAngle(L1, 0);
-    if (!pressingCheck("forward", frameDelay)) return;  
-    setServoAngle(L2, 135); setServoAngle(R1, 90);
-    if (!pressingCheck("forward", frameDelay)) return;
+    // --- Fase 1: Coppia A (R1/R3 + L2/L4) sollevata, Coppia B (L1/L3 + R2/R4) a terra ---
+    // 1. Solleva Coppia A da terra per evitare trascinamenti
+    setServoAngle(R3, 120); 
+    setServoAngle(L4, 120);
+    delayWithFace(frameDelay);
+    
+    // 2. Coppia A avanza in aria, Coppia B spinge indietro a terra (avanzamento)
+    setServoAngle(R1, 160); 
+    setServoAngle(L2, 110);
+    setServoAngle(L1, 70);  
+    setServoAngle(R2, 20);
+    delayWithFace(frameDelay);
+    
+    // 3. Appoggia saldamente Coppia A a terra
+    setServoAngle(R3, 180); 
+    setServoAngle(L4, 180);
+    delayWithFace(frameDelay);
+    
+    if (currentCommand != "forward") break;
+    
+    // --- Fase 2: Coppia B (L1/L3 + R2/R4) sollevata, Coppia A (R1/R3 + L2/L4) a terra ---
+    // 4. Solleva Coppia B da terra
+    setServoAngle(L3, 60);  
+    setServoAngle(R4, 60);
+    delayWithFace(frameDelay);
+    
+    // 5. Coppia B avanza in aria, Coppia A spinge indietro a terra (avanzamento)
+    setServoAngle(L1, 20);  
+    setServoAngle(R2, 70);
+    setServoAngle(R1, 110); 
+    setServoAngle(L2, 160);
+    delayWithFace(frameDelay);
+    
+    // 6. Appoggia saldamente Coppia B a terra
+    setServoAngle(L3, 0);   
+    setServoAngle(R4, 0);
+    delayWithFace(frameDelay);
+    
+    if (currentCommand != "forward") break;
   }
+  
   runStandPose(1);
 }
 
-// Logic reversed from Walk
+// Logic for walking backward with balanced diagonal trot
 inline void runWalkBackward() {
   Serial.println(F("WALK BACK"));
   setFaceWithMode("walk", FACE_ANIM_ONCE);
-  if (!pressingCheck("backward", frameDelay)) return;
   
   for (int i = 0; i < walkCycles; i++) {
-    setServoAngle(R3, 135); setServoAngle(L3, 0);
-    if (!pressingCheck("backward", frameDelay)) return;
-    setServoAngle(L4, 135); setServoAngle(L2, 135);
-    setServoAngle(R4, 0); setServoAngle(R1, 90);
-    if (!pressingCheck("backward", frameDelay)) return;    
-    setServoAngle(R2, 90); setServoAngle(L1, 0);
-    if (!pressingCheck("backward", frameDelay)) return;
-    setServoAngle(R4, 45); setServoAngle(L4, 180);
-    if (!pressingCheck("backward", frameDelay)) return;
-    setServoAngle(R3, 180); setServoAngle(L3, 45);
-    setServoAngle(R2, 45); setServoAngle(L1, 90);
-    if (!pressingCheck("backward", frameDelay)) return;  
-    setServoAngle(L2, 90); setServoAngle(R1, 180);
-    if (!pressingCheck("backward", frameDelay)) return;
+    // --- Fase 1: Coppia A sollevata, Coppia B a terra ---
+    // 1. Solleva Coppia A
+    setServoAngle(R3, 120); 
+    setServoAngle(L4, 120);
+    delayWithFace(frameDelay);
+    
+    // 2. Coppia A arretra in aria, Coppia B spinge in avanti a terra (arretramento)
+    setServoAngle(R1, 110); 
+    setServoAngle(L2, 160);
+    setServoAngle(L1, 20);  
+    setServoAngle(R2, 70);
+    delayWithFace(frameDelay);
+    
+    // 3. Appoggia Coppia A a terra
+    setServoAngle(R3, 180); 
+    setServoAngle(L4, 180);
+    delayWithFace(frameDelay);
+    
+    if (currentCommand != "backward") break;
+    
+    // --- Fase 2: Coppia B sollevata, Coppia A a terra ---
+    // 4. Solleva Coppia B
+    setServoAngle(L3, 60);  
+    setServoAngle(R4, 60);
+    delayWithFace(frameDelay);
+    
+    // 5. Coppia B arretra in aria, Coppia A spinge in avanti a terra (arretramento)
+    setServoAngle(L1, 70);  
+    setServoAngle(R2, 20);
+    setServoAngle(R1, 160); 
+    setServoAngle(L2, 110);
+    delayWithFace(frameDelay);
+    
+    // 6. Appoggia Coppia B a terra
+    setServoAngle(L3, 0);   
+    setServoAngle(R4, 0);
+    delayWithFace(frameDelay);
+    
+    if (currentCommand != "backward") break;
   }
+  
   runStandPose(1);
 }
 
-// Simple turn logic
+// Balanced turn left logic
 inline void runTurnLeft() {
   Serial.println(F("TURN LEFT"));
   setFaceWithMode("walk", FACE_ANIM_ONCE);
+  
   for (int i = 0; i < walkCycles; i++) {
-    //legset 1 (R1 L2)
-    setServoAngle(R3, 135); setServoAngle(L4, 135); 
-    if (!pressingCheck("left", frameDelay)) return;
-    setServoAngle(R1, 180); setServoAngle(L2, 180); 
-    if (!pressingCheck("left", frameDelay)) return;
-    setServoAngle(R3, 180); setServoAngle(L4, 180); 
-    if (!pressingCheck("left", frameDelay)) return;
-    setServoAngle(R1, 135); setServoAngle(L2, 135);
-    if (!pressingCheck("left", frameDelay)) return;
-      //legset 2 (R2 L1)
-    setServoAngle(R4, 45); setServoAngle(L3, 45); 
-    if (!pressingCheck("left", frameDelay)) return;
-    setServoAngle(R2, 90); setServoAngle(L1, 90); 
-    if (!pressingCheck("left", frameDelay)) return;
-    setServoAngle(R4, 0); setServoAngle(L3, 0); 
-    if (!pressingCheck("left", frameDelay)) return;
-    setServoAngle(R2, 45); setServoAngle(L1, 45);
-    if (!pressingCheck("left", frameDelay)) return;  
+    // --- Fase 1: Coppia A sollevata ---
+    setServoAngle(R3, 120); 
+    setServoAngle(L4, 120);
+    delayWithFace(frameDelay);
+    
+    // R1 avanti in aria, L2 indietro in aria; L1 avanti a terra, R2 indietro a terra
+    setServoAngle(R1, 160); 
+    setServoAngle(L2, 160);
+    setServoAngle(L1, 20);  
+    setServoAngle(R2, 20);
+    delayWithFace(frameDelay);
+    
+    setServoAngle(R3, 180); 
+    setServoAngle(L4, 180);
+    delayWithFace(frameDelay);
+    
+    if (currentCommand != "left") break;
+    
+    // --- Fase 2: Coppia B sollevata ---
+    setServoAngle(L3, 60);  
+    setServoAngle(R4, 60);
+    delayWithFace(frameDelay);
+    
+    // R2 avanti in aria, L1 indietro in aria; R1 indietro a terra, L2 avanti a terra
+    setServoAngle(R2, 70);  
+    setServoAngle(L1, 70);
+    setServoAngle(R1, 110); 
+    setServoAngle(L2, 110);
+    delayWithFace(frameDelay);
+    
+    setServoAngle(L3, 0);   
+    setServoAngle(R4, 0);
+    delayWithFace(frameDelay);
+    
+    if (currentCommand != "left") break;
   }
+  
   runStandPose(1);
 }
 
+// Balanced turn right logic
 inline void runTurnRight() {
   Serial.println(F("TURN RIGHT"));
   setFaceWithMode("walk", FACE_ANIM_ONCE);
+  
   for (int i = 0; i < walkCycles; i++) {
-    //legset 2 (R2 L1)
-    setServoAngle(R4, 45); setServoAngle(L3, 45); 
-    if (!pressingCheck("right", frameDelay)) return;
-    setServoAngle(R2, 0); setServoAngle(L1, 0); 
-    if (!pressingCheck("right", frameDelay)) return;
-    setServoAngle(R4, 0); setServoAngle(L3, 0); 
-    if (!pressingCheck("right", frameDelay)) return;
-    setServoAngle(R2, 45); setServoAngle(L1, 45);
-    if (!pressingCheck("right", frameDelay)) return;  
-    //legset 1 (R1 L2)
-    setServoAngle(R3, 135); setServoAngle(L4, 135); 
-    if (!pressingCheck("right", frameDelay)) return;
-    setServoAngle(R1, 90); setServoAngle(L2, 90); 
-    if (!pressingCheck("right", frameDelay)) return;
-    setServoAngle(R3, 180); setServoAngle(L4, 180); 
-    if (!pressingCheck("right", frameDelay)) return;
-    setServoAngle(R1, 135); setServoAngle(L2, 135);
-    if (!pressingCheck("right", frameDelay)) return;
+    // --- Fase 1: Coppia A sollevata ---
+    setServoAngle(R3, 120); 
+    setServoAngle(L4, 120);
+    delayWithFace(frameDelay);
+    
+    // R1 indietro in aria, L2 avanti in aria; L1 indietro a terra, R2 avanti a terra
+    setServoAngle(R1, 110); 
+    setServoAngle(L2, 110);
+    setServoAngle(L1, 70);  
+    setServoAngle(R2, 70);
+    delayWithFace(frameDelay);
+    
+    setServoAngle(R3, 180); 
+    setServoAngle(L4, 180);
+    delayWithFace(frameDelay);
+    
+    if (currentCommand != "right") break;
+    
+    // --- Fase 2: Coppia B sollevata ---
+    setServoAngle(L3, 60);  
+    setServoAngle(R4, 60);
+    delayWithFace(frameDelay);
+    
+    // R2 indietro in aria, L1 avanti in aria; R1 avanti a terra, L2 indietro a terra
+    setServoAngle(R2, 20);  
+    setServoAngle(L1, 20);
+    setServoAngle(R1, 160); 
+    setServoAngle(L2, 160);
+    delayWithFace(frameDelay);
+    
+    setServoAngle(L3, 0);   
+    setServoAngle(R4, 0);
+    delayWithFace(frameDelay);
+    
+    if (currentCommand != "right") break;
   }
+  
   runStandPose(1);
 }
