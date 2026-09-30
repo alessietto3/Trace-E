@@ -451,7 +451,10 @@ const char index_html[] PROGMEM = R"rawliteral(
       <!-- Settings & Status Section -->
       <div class="section">
         <div class="section-title">System</div>
-        <button class="btn-settings" onclick="openSettings()">Settings</button>
+        <div style="display:flex; gap:10px;">
+          <button class="btn-settings" style="flex:1;" onclick="openSettings()">Settings</button>
+          <button class="btn-settings" style="flex:1;" onclick="openSdManager()">📁 MicroSD</button>
+        </div>
         <div style="margin-top: 15px;">
           <div id="gamepadStatus" class="gamepad-status">Gamepad disconnected</div>
         </div>
@@ -569,6 +572,30 @@ const char index_html[] PROGMEM = R"rawliteral(
       </div>
 
       <button class="btn-close" onclick="closeMotorControl()">Close</button>
+    </div>
+  </div>
+
+  <div id="sdManagerPanel" class="settings-panel">
+    <div class="settings-content" style="max-width: 420px;">
+      <h3>MicroSD Face Manager</h3>
+      
+      <div class="settings-section">
+        <h4>Carica Faccia (.bin)</h4>
+        <p style="font-size:12px; color:#aaa; margin:0 0 10px 0;">Seleziona un file binario 160x128 (es. <code>happy_0.bin</code>):</p>
+        <input type="file" id="faceFileInput" accept=".bin" style="color:#fff; margin-bottom:10px; width:100%;">
+        <button class="btn-settings" style="width:100%;" onclick="uploadFaceFile()">Carica su MicroSD</button>
+        <div id="uploadStatus" style="font-size:13px; margin-top:8px; min-height:16px;"></div>
+      </div>
+
+      <div class="settings-section">
+        <h4>Facce su MicroSD (/faces)</h4>
+        <div id="sdFilesList" style="font-size:13px; max-height:220px; overflow-y:auto; margin-bottom:10px; border:1px solid #444; border-radius:8px; padding:6px; background:rgba(0,0,0,0.3);">
+          Caricamento...
+        </div>
+        <button class="btn-settings" style="width:100%;" onclick="loadSdFiles()">Aggiorna Elenco</button>
+      </div>
+
+      <button class="btn-close" onclick="closeSdManager()">Close</button>
     </div>
   </div>
 
@@ -939,6 +966,76 @@ function pollWifiConnect(attempt) {
     if (attempt < 30) setTimeout(() => pollWifiConnect(attempt + 1), 1000);
     else result.textContent = 'Lost contact with the robot. Rejoin its WiFi network and reopen Settings.';
   });
+}
+
+function openSdManager() {
+  document.getElementById('sdManagerPanel').style.display = 'block';
+  loadSdFiles();
+}
+
+function closeSdManager() {
+  document.getElementById('sdManagerPanel').style.display = 'none';
+}
+
+function loadSdFiles() {
+  const list = document.getElementById('sdFilesList');
+  list.innerHTML = '<span style="color:#aaa">Caricamento elenco file...</span>';
+  fetch('/api/sd/list').then(r => r.json()).then(data => {
+    if (!data.ready) {
+      list.innerHTML = '<span style="color:#ff6b6b">Scheda MicroSD non rilevata o non pronta!</span>';
+      return;
+    }
+    if (!data.files || data.files.length === 0) {
+      list.innerHTML = '<span style="color:#aaa">Nessun file presente nella cartella /faces</span>';
+      return;
+    }
+    let html = '<table style="width:100%; border-collapse:collapse; font-size:12px;">';
+    data.files.forEach(f => {
+      let baseName = f.name.replace(/\.bin$/i, '').replace(/_\d+$/, '');
+      html += `<tr style="border-bottom:1px solid #333;">
+        <td style="color:#fff; padding:6px 2px;">${f.name}</td>
+        <td style="text-align:right; padding:6px 2px; white-space:nowrap;">
+          <button style="padding:4px 8px; font-size:11px; margin-right:4px;" title="Anteprima sul robot" onclick="faceBtn('${baseName}')">&#128065;&#65039;</button>
+          <button style="padding:4px 8px; font-size:11px; background:#e63946;" title="Elimina file" onclick="deleteSdFile('${f.name}')">&#128465;&#65039;</button>
+        </td>
+      </tr>`;
+    });
+    html += '</table>';
+    list.innerHTML = html;
+  }).catch(err => {
+    list.innerHTML = '<span style="color:#ff6b6b">Errore di comunicazione con il robot</span>';
+  });
+}
+
+function uploadFaceFile() {
+  const input = document.getElementById('faceFileInput');
+  const status = document.getElementById('uploadStatus');
+  if (!input.files || input.files.length === 0) {
+    status.innerHTML = '<span style="color:#ff6b6b">Seleziona un file prima!</span>';
+    return;
+  }
+  const file = input.files[0];
+  const formData = new FormData();
+  formData.append('file', file, file.name);
+  status.innerHTML = '<span style="color:#ff8c42">Caricamento in corso...</span>';
+  fetch('/api/sd/upload', {
+    method: 'POST',
+    body: formData
+  }).then(r => r.json()).then(d => {
+    status.innerHTML = '<span style="color:#2ecc71">Caricato con successo!</span>';
+    input.value = '';
+    loadSdFiles();
+  }).catch(e => {
+    status.innerHTML = '<span style="color:#ff6b6b">Errore durante il caricamento</span>';
+  });
+}
+
+function deleteSdFile(fname) {
+  if (!confirm('Vuoi eliminare ' + fname + ' dalla MicroSD?')) return;
+  fetch('/api/sd/delete?file=' + encodeURIComponent(fname), { method: 'POST' })
+    .then(r => r.json())
+    .then(() => loadSdFiles())
+    .catch(e => alert('Errore eliminazione file'));
 }
 
 let activeGamepadIndex = null;

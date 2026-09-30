@@ -1,5 +1,8 @@
 #include <Arduino.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 #include <WiFi.h>
+#include <ArduinoOTA.h>
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <ESPmDNS.h>
@@ -11,6 +14,11 @@
 #include "face-bitmaps-tft.h"
 #include "movement-sequences.h"
 #include "captive-portal.h"
+#include "secret.h"
+
+#ifndef OTA_PASSWORD
+#error "Define OTA_PASSWORD in src/secret.h"
+#endif
 
 // --- Access Point Configuration ---
 // This is the network the Robot will create
@@ -20,9 +28,9 @@
 // --- Station Mode Configuration (Optional) ---
 // Set these to connect to your home/office WiFi network
 // Leave NETWORK_SSID empty to disable station mode
-#define NETWORK_SSID ""  // Your WiFi network name
-#define NETWORK_PASS ""  // Your WiFi password
-#define ENABLE_NETWORK_MODE false  // Set to true to enable network connection attempts
+#define NETWORK_SSID WIFI_SSID  // Your WiFi network name inside secret.h
+#define NETWORK_PASS WIFI_PASSWORD  // Your WiFi password inside secret.h
+#define ENABLE_NETWORK_MODE true  // Set to true to enable network connection attempts
 
 // ST7735 SPI display pins
 #define TFT_CS 17
@@ -44,6 +52,9 @@ const byte DNS_PORT = 53;
 Adafruit_ST7735 display(TFT_CS, TFT_DC, TFT_RST);
 WebServer server(80);
 bool sdCardReady = false;
+bool currentFaceFromSd = false;
+uint8_t sdFrameBuffer[FACE_WIDTH * FACE_HEIGHT / 8];
+File sdUploadFile;
 
 // Global state for animations
 String currentCommand = "";
@@ -79,6 +90,7 @@ bool networkConnected = false;
 IPAddress networkIP;
 String deviceHostname = "sesame-robot";
 bool mdnsOk = false;
+bool otaStarted = false;
 
 // Runtime WiFi provisioning (web UI) — the connect attempt runs as a state
 // machine driven from loop() so HTTP handlers never block the captive portal.
@@ -99,14 +111,14 @@ const uint32_t WIFI_SETUP_START_DELAY_MS = 300;  // let the HTTP response flush 
 // ----------------------------------------------------------------------
 // | Indice | Giunto | Posizione Fisica            | Pin GPIO ESP32 |
 // | :---:  | :---   | :---                        | :---:          |
-// |   0    |   R1   | Anca Anteriore Destra (FRH) | GPIO 13        |
-// |   1    |   R2   | Anca Posteriore Destra (RRH)| GPIO 12        |
-// |   2    |   L1   | Anca Anteriore Sinistra(FLH)| GPIO 14        |
-// |   3    |   L2   | Anca Posteriore Sinistra(RLH| GPIO 27        |
-// |   4    |   R4   | Gamba Posteriore Destra(RRL)| GPIO 26        |
-// |   5    |   R3   | Gamba Anteriore Destra (FRL)| GPIO 25        |
-// |   6    |   L3   | Gamba Anteriore Sinistra(FLL| GPIO 33        |
-// |   7    |   L4   | Gamba Posteriore Sinistra(RLL GPIO 32        |
+// |   0    |   R1   | Anca Anteriore Destra (FRH) | GPIO 13        |V
+// |   1    |   R2   | Anca Posteriore Destra (RRH)| GPIO 12        |V
+// |   2    |   L1   | Anca Anteriore Sinistra(FLH)| GPIO 14        |V
+// |   3    |   L2   | Anca Posteriore Sinistra(RLH| GPIO 27        |V
+// |   4    |   R4   | Gamba Posteriore Destra(RRL)| GPIO 26        |V
+// |   5    |   R3   | Gamba Anteriore Destra (FRL)| GPIO 25        |V
+// |   6    |   L3   | Gamba Anteriore Sinistra(FLL| GPIO 33        |V
+// |   7    |   L4   | Gamba Posteriore Sinistra(RLL GPIO 32        |V
 // ----------------------------------------------------------------------
 // Display ST7735 SPI: CS=17, RST=16, DC=4, SCK=18, MOSI=23
 // MicroSD SPI:        CS=5, MISO=19 (SCK=18, MOSI=23 in comune con TFT)
@@ -232,11 +244,18 @@ void handleWifiStatus();
 void handleNotFound();
 String jsonEscape(const String& s);
 bool startMdns();
+void startOta();
 void announceNetwork(const String& ssid);
 void setApOnlyInfoText();
 void showWifiInfoNow();
 void updateWifiSetup();
 void finishWifiSetup(const String& err);
+void handleUploadFinish();
+void handleUploadFile();
+void handleSdList();
+void handleSdDelete();
+uint8_t countSdFaceFrames(const String& name);
+bool loadSdFaceFrame(const String& name, uint8_t frameIndex, uint8_t* buffer);
 
 void handleRoot() {
   server.send(200, "text/html", index_html);
@@ -426,6 +445,83 @@ String jsonEscape(const String& s) {
   return out;
 }
 
+void handleUploadFinish() {
+  server.send(200, "application/json", "{\"status\":\"ok\",\"message\":\"File uploaded successfully\"}");
+}
+
+void handleUploadFile() {
+  HTTPUpload& upload = server.upload();
+  if (upload.status == UPLOAD_FILE_START) {
+    if (!sdCardReady) return;
+    if (!SD.exists("/faces")) {
+      SD.mkdir("/faces");
+    }
+    String filename = upload.filename;
+    int idx = filename.lastIndexOf('\\');
+    if (idx >= 0) filename = filename.substring(idx + 1);
+    idx = filename.lastIndexOf('/');
+    if (idx >= 0) filename = filename.substring(idx + 1);
+
+    String fullPath = "/faces/" + filename;
+    Serial.printf("SD Upload start: %s\n", fullPath.c_str());
+    sdUploadFile = SD.open(fullPath.c_str(), FILE_WRITE);
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    if (sdUploadFile) {
+      sdUploadFile.write(upload.buf, upload.currentSize);
+    }
+  } else if (upload.status == UPLOAD_FILE_END) {
+    if (sdUploadFile) {
+      sdUploadFile.close();
+      Serial.printf("SD Upload complete: %s (%u bytes)\n", upload.filename.c_str(), upload.totalSize);
+    }
+  }
+}
+
+void handleSdList() {
+  if (!sdCardReady) {
+    server.send(200, "application/json", "{\"ready\":false,\"files\":[]}");
+    return;
+  }
+  File root = SD.open("/faces");
+  if (!root || !root.isDirectory()) {
+    server.send(200, "application/json", "{\"ready\":true,\"files\":[]}");
+    return;
+  }
+  String json = "{\"ready\":true,\"files\":[";
+  File file = root.openNextFile();
+  bool first = true;
+  while (file) {
+    if (!file.isDirectory()) {
+      if (!first) json += ",";
+      first = false;
+      String fname = String(file.name());
+      int slash = fname.lastIndexOf('/');
+      if (slash >= 0) fname = fname.substring(slash + 1);
+      json += "{\"name\":\"" + jsonEscape(fname) + "\",\"size\":" + String(file.size()) + "}";
+    }
+    file = root.openNextFile();
+  }
+  json += "]}";
+  server.send(200, "application/json", json);
+}
+
+void handleSdDelete() {
+  if (!sdCardReady || !server.hasArg("file")) {
+    server.send(400, "application/json", "{\"error\":\"Missing arg or SD not ready\"}");
+    return;
+  }
+  String filename = server.arg("file");
+  int slash = filename.lastIndexOf('/');
+  if (slash >= 0) filename = filename.substring(slash + 1);
+  String fullPath = "/faces/" + filename;
+  bool ok = SD.remove(fullPath.c_str());
+  if (ok) {
+    server.send(200, "application/json", "{\"status\":\"ok\"}");
+  } else {
+    server.send(500, "application/json", "{\"error\":\"Could not remove file\"}");
+  }
+}
+
 // Start (or restart, after MDNS.end()) the mDNS responder. Tracks the result
 // in mdnsOk so the API can avoid advertising a .local name that won't resolve.
 bool startMdns() {
@@ -439,12 +535,132 @@ bool startMdns() {
   return mdnsOk;
 }
 
+static int lastOtaPercent = -1;
+
+void drawOtaStart() {
+  lastOtaPercent = -1;
+  // Detach all servos to avoid current draw and twitching during flash writing
+  for (int i = 0; i < 8; i++) {
+    servos[i].detach();
+  }
+  display.fillScreen(ST7735_BLACK);
+
+  // Header Banner
+  display.fillRoundRect(8, 4, 144, 20, 4, 0x1A2F); // Dark blue banner
+  display.drawRoundRect(8, 4, 144, 20, 4, ST7735_CYAN);
+  display.setTextColor(ST7735_WHITE);
+  display.setTextSize(1);
+  display.setCursor(20, 10);
+  display.print(F("BRAIN UPGRADE (OTA)"));
+
+  // Robot Eyes (Downloading mood / Matrix eyes)
+  display.drawRoundRect(34, 30, 38, 28, 6, ST7735_CYAN);
+  display.drawRoundRect(88, 30, 38, 28, 6, ST7735_CYAN);
+
+  // Progress Bar Frame
+  display.drawRoundRect(14, 72, 132, 16, 4, 0x7BEF); // Gray border
+  display.drawRoundRect(15, 73, 130, 14, 3, ST7735_WHITE);
+
+  // Subtitle
+  display.setTextColor(ST7735_YELLOW, ST7735_BLACK);
+  display.setCursor(18, 96);
+  display.print(F("Flashing New Brain..."));
+}
+
+void drawOtaProgress(unsigned int progress, unsigned int total) {
+  if (total == 0) return;
+  int percent = (progress * 100) / total;
+  if (percent == lastOtaPercent && percent < 100) return;
+  lastOtaPercent = percent;
+
+  // Progress bar fill (max width = 126px)
+  int barW = (percent * 126) / 100;
+  if (barW > 0) {
+    display.fillRect(17, 75, barW, 10, ST7735_GREEN);
+  }
+  if (barW < 126) {
+    display.fillRect(17 + barW, 75, 126 - barW, 10, ST7735_BLACK);
+  }
+
+  // Eye scanning animation (fill inside eyes from top to bottom based on progress)
+  int eyeFillH = (percent * 22) / 100;
+  if (eyeFillH > 0) {
+    display.fillRect(37, 33, 32, eyeFillH, ST7735_CYAN);
+    display.fillRect(91, 33, 32, eyeFillH, ST7735_CYAN);
+  }
+
+  // Numeric percentage text
+  display.setTextColor(ST7735_GREEN, ST7735_BLACK);
+  display.setTextSize(1);
+  display.setCursor(68, 112);
+  display.printf("%3d%%", percent);
+}
+
+void drawOtaEnd() {
+  display.fillScreen(ST7735_BLACK);
+
+  // Happy celebration badge
+  display.fillRoundRect(10, 18, 140, 36, 6, ST7735_GREEN);
+  display.setTextColor(ST7735_BLACK, ST7735_GREEN);
+  display.setTextSize(2);
+  display.setCursor(20, 28);
+  display.print(F("UPDATE OK!"));
+
+  display.setTextColor(ST7735_CYAN, ST7735_BLACK);
+  display.setTextSize(1);
+  display.setCursor(30, 68);
+  display.print(F("Rebooting robot..."));
+
+  display.setTextColor(ST7735_WHITE, ST7735_BLACK);
+  display.setCursor(38, 88);
+  display.print(F("See you soon!"));
+}
+
+void drawOtaError(ota_error_t error) {
+  display.fillScreen(ST7735_RED);
+  display.setTextColor(ST7735_WHITE, ST7735_RED);
+  display.setTextSize(2);
+  display.setCursor(15, 25);
+  display.print(F("OTA ERROR!"));
+  display.setTextSize(1);
+  display.setCursor(20, 60);
+  display.printf("Error Code: %u", error);
+  display.setCursor(20, 80);
+  display.print(F("Rebooting..."));
+}
+
+void startOta() {
+  if (otaStarted || !networkConnected || WiFi.status() != WL_CONNECTED) return;
+
+  ArduinoOTA.setHostname(deviceHostname.c_str());
+  ArduinoOTA.setPassword(OTA_PASSWORD);
+  ArduinoOTA.onStart([]() {
+    Serial.println(F("OTA update started."));
+    drawOtaStart();
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    drawOtaProgress(progress, total);
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println(F("OTA update complete; rebooting."));
+    drawOtaEnd();
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("OTA error [%u]\n", error);
+    drawOtaError(error);
+  });
+  ArduinoOTA.begin();
+  otaStarted = true;
+  Serial.println("OTA ready at " + networkIP.toString());
+}
+
 // Post-join side effects shared by the boot path and the web provisioning
 // path: re-announce mDNS on the new station interface and rebuild the OLED
 // scroll text for the joined network.
 void announceNetwork(const String& ssid) {
   MDNS.end();
   startMdns();
+  startOta();
   wifiInfoText = "AP: " + String(AP_SSID) + " (" + WiFi.softAPIP().toString() +
                  ")  |  Network: " + ssid + " (" + networkIP.toString() + ") or " +
                  deviceHostname + ".local  |  ";
@@ -670,12 +886,12 @@ void handleNotFound() {
 }
 
 void setup() {
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); // Disable brownout detector to prevent reboot during WiFi transmission spikes
   Serial.begin(115200);
   randomSeed(micros());
   
   // Shared SPI init for the ST7735 and SD card.
   SPI.begin(TFT_SCK, SD_MISO, TFT_MOSI, TFT_CS);
-  SPI.setFrequency(80000000); // 80 MHz, massimo supportato dal driver
   pinMode(TFT_CS, OUTPUT);
   digitalWrite(TFT_CS, HIGH);
   pinMode(SD_CS, OUTPUT);
@@ -746,6 +962,11 @@ void setup() {
   server.on("/api/wifi/scan", handleWifiScan);
   server.on("/api/wifi/connect", handleWifiConnect);
   server.on("/api/wifi/status", handleWifiStatus);
+
+  // MicroSD Face Manager endpoints
+  server.on("/api/sd/list", HTTP_GET, handleSdList);
+  server.on("/api/sd/upload", HTTP_POST, handleUploadFinish, handleUploadFile);
+  server.on("/api/sd/delete", HTTP_POST, handleSdDelete);
   
   // Catch-all route for captive portal
   // This ensures any URL redirects to the controller page
@@ -778,6 +999,7 @@ void loop() {
   dnsServer.processNextRequest();
   
   server.handleClient();
+  if (otaStarted) ArduinoOTA.handle();
   updateWifiSetup();
   updateAnimatedFace();
   updateIdleBlink();
@@ -945,8 +1167,41 @@ uint8_t countFrames(const unsigned char* const* frames, uint8_t maxFrames) {
   return count;
 }
 
+uint8_t countSdFaceFrames(const String& name) {
+  if (!sdCardReady) return 0;
+  uint8_t count = 0;
+  for (uint8_t i = 0; i < MAX_FACE_FRAMES; i++) {
+    String path = "/faces/" + name + "_" + String(i) + ".bin";
+    if (SD.exists(path.c_str())) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  if (count == 0) {
+    String path = "/faces/" + name + ".bin";
+    if (SD.exists(path.c_str())) {
+      count = 1;
+    }
+  }
+  return count;
+}
+
+bool loadSdFaceFrame(const String& name, uint8_t frameIndex, uint8_t* buffer) {
+  if (!sdCardReady || buffer == nullptr) return false;
+  String path = "/faces/" + name + "_" + String(frameIndex) + ".bin";
+  if (!SD.exists(path.c_str())) {
+    path = "/faces/" + name + ".bin";
+  }
+  File f = SD.open(path.c_str(), FILE_READ);
+  if (!f) return false;
+  size_t bytesRead = f.read(buffer, FACE_WIDTH * FACE_HEIGHT / 8);
+  f.close();
+  return (bytesRead == (FACE_WIDTH * FACE_HEIGHT / 8));
+}
+
 void setFace(const String& faceName) {
-  if (faceName == currentFaceName && currentFaceFrames != nullptr) return;
+  if (faceName == currentFaceName && (currentFaceFrames != nullptr || currentFaceFromSd)) return;
 
   currentFaceName = faceName;
   currentFaceFrameIndex = 0;
@@ -956,6 +1211,24 @@ void setFace(const String& faceName) {
   faceAnimFinished = false;
   currentFaceFps = getFaceFpsForName(faceName);
 
+  // Check if face exists on SD Card first
+  uint8_t sdFrames = countSdFaceFrames(faceName);
+  if (sdFrames > 0) {
+    bool loaded = loadSdFaceFrame(faceName, 0, sdFrameBuffer);
+    if (loaded) {
+      currentFaceFromSd = true;
+      currentFaceFrameCount = sdFrames;
+      currentFaceFrames = nullptr;
+      display.drawBitmap(0, 0, sdFrameBuffer, FACE_WIDTH, FACE_HEIGHT, getFaceColor(currentFaceName), ST7735_BLACK);
+      lastDrawnBitmap = nullptr;
+      lastDrawnColor = getFaceColor(currentFaceName);
+      return;
+    }
+    // SD load failed: fall through to PROGMEM fallback
+  }
+
+  // Fallback to embedded flash bitmaps
+  currentFaceFromSd = false;
   currentFaceFrames = face_defualt_frames;
   currentFaceFrameCount = countFrames(face_defualt_frames, MAX_FACE_FRAMES);
 
@@ -1001,7 +1274,8 @@ int getFaceFpsForName(const String& faceName) {
 }
 
 void updateAnimatedFace() {
-  if (currentFaceFrames == nullptr || currentFaceFrameCount <= 1) return;
+  if (currentFaceFrameCount <= 1) return;
+  if (!currentFaceFromSd && currentFaceFrames == nullptr) return;
   if (currentFaceMode == FACE_ANIM_ONCE && faceAnimFinished) return;
 
   unsigned long now = millis();
@@ -1035,7 +1309,14 @@ void updateAnimatedFace() {
         }
       }
     }
-    updateFaceBitmap(currentFaceFrames[currentFaceFrameIndex]);
+
+    if (currentFaceFromSd) {
+      if (loadSdFaceFrame(currentFaceName, currentFaceFrameIndex, sdFrameBuffer)) {
+        display.drawBitmap(0, 0, sdFrameBuffer, FACE_WIDTH, FACE_HEIGHT, getFaceColor(currentFaceName), ST7735_BLACK);
+      }
+    } else {
+      updateFaceBitmap(currentFaceFrames[currentFaceFrameIndex]);
+    }
   }
 }
 
@@ -1044,6 +1325,7 @@ void delayWithFace(unsigned long ms) {
   while (millis() - start < ms) {
     updateAnimatedFace();
     server.handleClient();
+    if (otaStarted) ArduinoOTA.handle();
     dnsServer.processNextRequest();
     delay(5);
   }
@@ -1107,6 +1389,7 @@ bool pressingCheck(String cmd, int ms) {
   unsigned long start = millis();
   while (millis() - start < ms) {
     server.handleClient();
+    if (otaStarted) ArduinoOTA.handle();
     dnsServer.processNextRequest();
     updateAnimatedFace();
     if (currentCommand != cmd) {
