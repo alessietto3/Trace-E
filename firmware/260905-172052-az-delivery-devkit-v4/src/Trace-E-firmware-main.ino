@@ -1026,6 +1026,12 @@ void loop() {
     else if (cmd == "shrug") runShrugPose();
     else if (cmd == "dead") runDeadPose();
     else if (cmd == "crab") runCrabPose();
+    else if (cmd == "happy") runHappyPose();
+    else if (cmd == "love") runLovePose();
+    else if (cmd == "angry") runAngryPose();
+    else if (cmd == "sad") runSadPose();
+    else if (cmd == "surprised") runSurprisedPose();
+    else if (cmd == "excited") runExcitedPose();
   }
   
   // Serial CLI for debugging (can be used to diagnose servo position issues and wiring)

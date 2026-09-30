@@ -66,6 +66,12 @@ void runWalkPose();
 void runWalkBackward();
 void runTurnLeft();
 void runTurnRight();
+void runHappyPose();
+void runLovePose();
+void runAngryPose();
+void runSadPose();
+void runSurprisedPose();
+void runExcitedPose();
 
 // ====== POSES ======
 inline void runRestPose() { 
@@ -513,4 +519,95 @@ inline void runTurnRight() {
   }
   
   runStandPose(1);
+}
+
+inline void runHappyPose() {
+  Serial.println(F("HAPPY"));
+  setFaceWithMode("happy", FACE_ANIM_LOOP);
+  runStandPose(0);
+  delayWithFace(200);
+  for (int i = 0; i < 4; i++) {
+    setServoAngle(R4, 40); setServoAngle(L4, 140);
+    delayWithFace(200);
+    setServoAngle(R4, 0); setServoAngle(L4, 180);
+    delayWithFace(200);
+  }
+  runStandPose(1);
+  if (currentCommand == "happy") currentCommand = "";
+}
+
+inline void runLovePose() {
+  Serial.println(F("LOVE"));
+  setFaceWithMode("love", FACE_ANIM_LOOP);
+  runStandPose(0);
+  delayWithFace(200);
+  setServoAngle(L1, 20); setServoAngle(R1, 160);
+  setServoAngle(L3, 160); setServoAngle(R3, 20);
+  delayWithFace(400);
+  for (int i = 0; i < 3; i++) {
+    setServoAngle(R4, 30); setServoAngle(L4, 150);
+    delayWithFace(300);
+    setServoAngle(R4, 0); setServoAngle(L4, 180);
+    delayWithFace(300);
+  }
+  runStandPose(1);
+  if (currentCommand == "love") currentCommand = "";
+}
+
+inline void runAngryPose() {
+  Serial.println(F("ANGRY"));
+  setFaceWithMode("angry", FACE_ANIM_LOOP);
+  runStandPose(0);
+  delayWithFace(200);
+  for (int i = 0; i < 3; i++) {
+    setServoAngle(R3, 90); delayWithFace(150);
+    setServoAngle(R3, 180); delayWithFace(150);
+    setServoAngle(L3, 90); delayWithFace(150);
+    setServoAngle(L3, 0); delayWithFace(150);
+  }
+  runStandPose(1);
+  if (currentCommand == "angry") currentCommand = "";
+}
+
+inline void runSadPose() {
+  Serial.println(F("SAD"));
+  setFaceWithMode("sad", FACE_ANIM_LOOP);
+  runStandPose(0);
+  delayWithFace(200);
+  setServoAngle(R3, 120); setServoAngle(L3, 60);
+  setServoAngle(R4, 60); setServoAngle(L4, 120);
+  delayWithFace(2500);
+  runStandPose(1);
+  if (currentCommand == "sad") currentCommand = "";
+}
+
+inline void runSurprisedPose() {
+  Serial.println(F("SURPRISED"));
+  setFaceWithMode("surprised", FACE_ANIM_ONCE);
+  runStandPose(0);
+  delayWithFace(100);
+  setServoAngle(R1, 150); setServoAngle(L1, 30);
+  setServoAngle(R2, 30); setServoAngle(L2, 150);
+  setServoAngle(R3, 180); setServoAngle(L3, 0);
+  setServoAngle(R4, 0); setServoAngle(L4, 180);
+  delayWithFace(2000);
+  runStandPose(1);
+  if (currentCommand == "surprised") currentCommand = "";
+}
+
+inline void runExcitedPose() {
+  Serial.println(F("EXCITED"));
+  setFaceWithMode("excited", FACE_ANIM_LOOP);
+  runStandPose(0);
+  delayWithFace(150);
+  for (int i = 0; i < 6; i++) {
+    setServoAngle(R1, 150); setServoAngle(L1, 60);
+    setServoAngle(R2, 60); setServoAngle(L2, 150);
+    delayWithFace(150);
+    setServoAngle(R1, 120); setServoAngle(L1, 30);
+    setServoAngle(R2, 30); setServoAngle(L2, 120);
+    delayWithFace(150);
+  }
+  runStandPose(1);
+  if (currentCommand == "excited") currentCommand = "";
 }
